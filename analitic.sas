@@ -12,6 +12,7 @@
 
 Libname &LN "Z:\AC\OLL-2009\SAS"; * Библиотека данных;
 %let y = cl;
+%let cens = (99, 132, 258, 264)
 
 %macro Eventan(dat,T,C,i,s,cl,f,for, ttl);
 /*
@@ -62,6 +63,7 @@ proc format;
     value risk_f 1 = "Стандартная" 2 = "Высокая" 3 = "нет данных";
     value age_group_f low-30 = "младшая (до 30)" 30-40 = "средняя (30-40)" 40-high = "старшая (40-55)";
 	value tkm_f 0="нет" 1="ауто" 2="алло";
+	value it_f 1="есть" 0 = "нет";
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -69,6 +71,7 @@ data &LN..all_pt;
     set &LN..all_pt;
     rename
         new_protokol_ollid = pguid
+		new_nbrpacient = pt_id
         new_name = name
         new_datest = pr_b
         new_datefn = pr_e
@@ -81,7 +84,7 @@ data &LN..all_et;
     rename
         new_datest = ph_b
         new_datefn = ph_e
-        new_name = name
+        new_protokolname = name_e
         new_protokol = pguid
 		new_group_risk = fin_group_risk
 		new_group_riskname = fin_group_riskname
@@ -96,7 +99,7 @@ data &LN..all_ev;
 run;
 /*------ цензурирование, и вычисление производных показателей ----------*/
 
-data &LN..all_pt;
+data &LN..all_pt; *только по таблице пациентов;
     set &LN..all_pt;
 
 /*пока обнуляем возраст, потом будем перезабивать*/
@@ -122,8 +125,81 @@ data &LN..all_pt;
     end;
 
 /* ручное цензурирование данных*/
-    if NOT(new_nbrpacient in (99, 132, 258, 264) ) then output;
+    if NOT(new_nbrpacient in &cens ) then output;
 run;
+
+/*-----------------------------------блок парсинга событий на этапах----------------------*/
+proc sort data=&LN..all_et;
+    by pguid new_etap_protokol; *сортируем таблицу этапов по ID пациентов и по этапам протокола (в хронологическом порядке);
+run;
+
+proc sort data=&LN..all_pt;
+    by pguid; *сортируем таблицу этапов по ID пациентов и по этапам протокола (в хронологическом порядке);
+run;
+
+/*Соединяем таблицы пациентов и этапов, определяем для кого из пациентов нет записи об этапах*/
+data &LN..new_et;
+    merge &LN..all_pt (in = i1) &LN..all_et (in = i2);
+    by pguid;
+
+    it1 = i1;
+    it2 = i2;
+run;
+
+
+/*ТУТ ДОПИСАТЬ ПРОВЕРКУ ТАЙМЛАЙНА*/
+
+
+/*прочесываем созданную таблицу, для каждой последней записи загоняем смену на дексаметазон, и номер этапа. Последнюю выводим в датасет*/
+data &LN..new_pt &LN..error_timeline /*(keep=)*/;
+    set &LN..new_et;
+    by pguid;
+    retain lastdate ec   d_ch faza time_error ; *ec -- это количество этапов "свернутых";
+    if first.pguid then do; lastdate = .; ec = 0; time_error = 0; end;
+/*--------------------------------------------------*/
+    if it2 then ec + 1;
+    if ph_b > lastdate then do; lastdate = ph_b; time_error = 1; end; *Проверка на последнюю дату. ;
+    if ph_e > lastdate then do; lastdate = ph_e; time_error = 1; end;
+
+    if new_smena_na_deksamet = 1 then
+        do;
+            d_ch = 1;
+            faza = new_etap_protokol;
+        end;
+/*---------------------------------------------------*/
+    if last.pguid then
+        do;
+            output &LN..new_pt;
+			if time_error ne 0 then output &LN..error_timeline;
+            d_ch = 0;
+            faza = .;
+			time_error = 0;
+        end;
+run;
+
+
+
+
+
+/*РЕПОРТИНГ ОБ ОШИБКАХ РЕЛЯЦИЯХ ПАЦИЕНТ-ЭТАП*/
+
+data &LN..error_ptVSet;
+	set &LN..new_et (keep = pt_id name name_e new_etap_protokolname it1 it2);
+	if it1 ne it2 then output; 
+run;
+
+proc print data = &LN..error_ptVSet split='*' N obs="Номер*ошибки";
+	var pt_id name name_e new_etap_protokolname it1 it2;
+	label pt_id = 'Номер пациента*в протоколе'
+          name = 'Имя*в базе пациентов'
+          name_e = 'Имя*в базе этапов'
+		  new_etap_protokolname = 'этап'
+		  it1 = 'Запись*в базе пациентов' 
+		  it2 = 'Запись* в базе этапов';
+	title "Ошибки в базе (пара пациент - этап)" ;
+	format  it1 it2 it_f. ; 
+run;
+
 /*----------------------------------------------------------------------------------------*/
 
 /*------------тут нужно будет подцепить заплатку возрастов----------*/
@@ -152,7 +228,7 @@ run;
 /*	- бифенотипическийъ*/
 
 proc means data = &LN..all_pt N;
-	var new_nbrpacient;
+	var pt_id;
    title 'Всего записей';
 run;
 
@@ -284,20 +360,23 @@ run;
 /*Работаем с другой таблицей (этап протокола)*/
 /*1. СЧЕТЧИК СМЕНЫ*/
 
-data &LN..all_et;
-    set &LN..all_et;
-        select;
-        when (new_etap_protokolname = 'Предфаза')  ne = 1;
-        when (new_etap_protokolname = 'Первая фаза индукции')  ne = 2;
-        when (new_etap_protokolname = 'Вторая фаза индукции')  ne = 3;
-        when (new_etap_protokolname = 'Курс консолидации I')  ne = 4;
-        when (new_etap_protokolname = 'Курс консолидации II')  ne = 5;
-        when (new_etap_protokolname = 'Курс консолидации III')  ne = 6;
-        when (new_etap_protokolname = 'Курс консолидации IV')  ne = 7;
 
-        otherwise;
-    end;
-run;
+/*парсить не надо, есть переменная new_etap_protokol*/
+
+/*data &LN..all_et;*/
+/*    set &LN..all_et;*/
+/*        select;*/
+/*        when (new_etap_protokolname = 'Предфаза')  ne = 1;*/
+/*        when (new_etap_protokolname = 'Первая фаза индукции')  ne = 2;*/
+/*        when (new_etap_protokolname = 'Вторая фаза индукции')  ne = 3;*/
+/*        when (new_etap_protokolname = 'Курс консолидации I')  ne = 4;*/
+/*        when (new_etap_protokolname = 'Курс консолидации II')  ne = 5;*/
+/*        when (new_etap_protokolname = 'Курс консолидации III')  ne = 6;*/
+/*        when (new_etap_protokolname = 'Курс консолидации IV')  ne = 7;*/
+/**/
+/*        otherwise;*/
+/*    end;*/
+/*run;*/
 
 
 proc sort data=&LN..all_et;
@@ -332,12 +411,16 @@ run;
 /*      /nocum;*/
 /*run;*/
 
-proc freq data=&LN..all_et;
-    tables
-new_etap_protokolname
-        /nocum;
-    title 'Всего проведено этапов';
-run;
+
+/*-----------непонятный  рудимент -----------------*/
+
+/*proc freq data=&LN..all_et;*/
+/*    tables*/
+/*new_etap_protokolname*/
+/*        /nocum;*/
+/*    title 'Всего проведено этапов';*/
+/*run;*/
+/*--------------------------------------------------*/
 
 proc sort data=&LN..all_pr;
     by pguid;
