@@ -58,11 +58,11 @@ data _Null_; * Не создаем ни какого датасета;
 	CALL execute ('%lbls('||TN||')'); * выполнить макрос присвоения лейбалов;
 run; 
 
-/*/*ЗАПЛАТКА!!! Подгружаем последние данные по контактам*/*/
-/*proc import datafile="Z:\AC\OLL-2009\LC_300913.txt" dbms=tab out=&LN..tmp_AGE replace; */
-/*		getnames=yes; * получать имена переменных?;*/
-/*		guessingrows=500;  * как много строк нужно просканировать, для определения максемальной длинны поля;*/
-/*run; */
+/*ЗАПЛАТКА!!! Подгружаем данные по возрастам*/
+proc import datafile="&dirURI.age.txt" dbms=tab out=&LN..tmp_AGE replace; 
+		getnames=yes; * получать имена переменных?;
+		guessingrows=500;  * как много строк нужно просканировать, для определения максемальной длинны поля;
+run; 
 
 *загоняем в транспортный файл;
 proc cport library=&LN file=tranfile;
