@@ -10,6 +10,7 @@
 /***********************************************************************************************************/
 /***********************************************************************************************************/
 
+%let LN = ALL2009; * имя библиотеки;
 Libname &LN "Z:\AC\OLL-2009\SAS"; * Библиотека данных;
 %let y = cl;
 %let cens = (99, 132, 258, 264);
@@ -46,7 +47,7 @@ run;
 title1 &ttl;
 title2 " зависимая:  &tt1 // фактор       :  &tt2";
 ods graphics on;
-ods exclude WilHomCov LogHomCov HomStats ProductLimitEstimates Quartiles;
+ods exclude WilHomCov LogHomCov HomStats  Quartiles; *ProductLimitEstimates;
 proc lifetest data=&dat plots =(s( &s &cl))  method=pl ;
     %if &f ne %then %do; strata &f/test=logrank;
     id &f;format   &f &for;%end;
@@ -58,7 +59,7 @@ ods graphics off;
 
 
 proc format;
-    value oc_f  1 = "Т-клеточный" 2 = "B-клеточный" 3 = "Бифенотипический" 0 = "Неизвестен" ;
+    value oc_f  1 = "B-клеточный" 2 = "T-клеточный" 3 = "Бифенотипический" 0 = "Неизвестен" ;
     value gender_f 1 = "Мужчины" 2 = "Женщины";
     value risk_f 1 = "Стандартная" 2 = "Высокая" 3 = "нет данных";
     value age_group_f low-30 = "до 30-ти лет" 30-high = "после 30-ти лет";
@@ -284,17 +285,17 @@ run;
 
 /*прошерстить таблицу событий и убрать все повторяющиеся, оставив только первые*/
 proc sort data=&LN..all_ev;
-    by pguid new_event descending new_event_date ;
+    by pguid new_event new_event_date ;
 run;
+
+
 
 data &LN..all_ev_red;
 	set &LN..all_ev;
-	by pguid new_event descending new_event_date ;
-	retain event; 
-	if first.guid then event = .;
-	if event ne new_event then output;
-	event = new_event;
+	by pguid new_event new_event_date ;
+	if first.new_event then output;
 run;
+
 
 /*Прицепляем события к пациентам. Нам нужны индикаторы и даты рецедива и смерти*/
 
@@ -329,6 +330,7 @@ data &LN..new_pt;
 /*---------------------------------*/
     if last.pguid then do; output; i_rel = 0; date_rel = .; /**/ i_death = 0; date_death = .; /**/ i_rem = 0; date_rem = .; Laspot = 0; end;
 run;
+
 
 /*поставить заплатку если время рецидива равно нулю то сегодняшняя дата <----------- ЕСТЬ ЛИ ЭТО????*/
 /*обновление последнего контакта за счет смерти*/
@@ -405,7 +407,7 @@ run;
 footnote " ";
 
 proc means data = &LN..all_pt N;
-	var pt_id;
+	var pguid;
    title 'Всего записей';
 run;
 
@@ -574,10 +576,19 @@ run;
 
 proc freq data=&LN..new_pt ;
    tables  d_ch*new_group_risk/ nocum;
+   title 'Смена на дексаметазон по группам риска';
+   format new_group_risk new_group_risk_f. d_ch y_n.;
+run;
+proc freq data=&LN..new_pt ;
+   tables  new_group_risk/ nocum;
+   title 'Группы риска';
+   format new_group_risk new_group_risk_f. d_ch y_n.;
+run;
+proc freq data=&LN..new_pt ;
+   tables  d_ch/ nocum;
    title 'Смена на дексаметазон';
    format new_group_risk new_group_risk_f. d_ch y_n.;
 run;
-
 
 /*-----------непонятный  рудимент -----------------*/
 
@@ -627,6 +638,11 @@ run;
 *%eventan (&LN..tmp, TRF, iRF, 0,F,&y,oll_class,oc_f.,"стратификация по нозологиям");
 
 /*---------------- стратификация по кариотипу -----------------*/
+
+proc print data = &LN..new_pt;
+	var pt_id name new_normkariotipname;
+run; 
+
 %eventan (&LN..new_pt, TLive, i_death, 0,,&y,new_normkariotipname,,"Стратификация по кариотипу. Выживаемость");
 %eventan (&LN..new_pt, TRF, iRF, 0,,&y,new_normkariotipname,,"Стратификация по кариотипу. Безрецидивная выживаемость");
 %eventan (&LN..new_pt, Trel, i_rel, 0,F,&y,new_normkariotipname,,"Стратификация по кариотипу Вероятность развития рецидива"); *вероятность развития рецидива;
@@ -729,12 +745,16 @@ run;
 
 /*data a;*/
 /*	set &LN..new_pt;*/
-/*/*	if age > 30 and oll_class = 2 then output;*/*/
-/*	if pguid = "BF9718B0-AD79-E211-A54D-10000001B347" then output;*/
+/*	if Trel > 30 and oll_class = 2 then output;*/
+/*/*	if pguid = "BF9718B0-AD79-E211-A54D-10000001B347" then output;*/*/
 /*run;*/
-/**/
+
 /*proc print data = a;*/
 /*run;*/
+
+
+
+
 
 /*VVVVVVVVVVVVVVVVVVVVVVVVV   не разобрано    VVVVVVVVVVVVVVVVVVVVVVVVVV*/
 
