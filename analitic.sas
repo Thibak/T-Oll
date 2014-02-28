@@ -10,11 +10,27 @@
 /***********************************************************************************************************/
 /***********************************************************************************************************/
 /*идентификатор компа*/ *D - sony, Z - ГНЦ;
-%if &sysscpl = "W32_7PRO" %then 
-	%let disk = D; *sony;
+/*идентификатор компа*/ *D - sony, Z - ГНЦ;
+%macro what_OC;
+%if &sysscpl = W32_7PRO %then 
+	%do;
+		%let disk = D; *sony;
+	%end;
 %else/*%if &sysscpl = "W32_7PRO" %then */ 
-	%let disk = Z; *остальные;
+	%do;
+		%let disk = Z; *остальные;
+	%end;
+%mend;
 
+
+/*определитель ОС*/
+/*data comp;*/
+/*	OC = "&sysscpl";*/
+/*run;*/
+/**/
+/*proc print data = COMP;*/
+/*run;*/
+%what_OC;
 
 %let LN = ALL2009; * имя библиотеки;
 Libname &LN "&disk.:\AC\OLL-2009\SAS"; * Библиотека данных;
@@ -198,14 +214,12 @@ data &LN..new_et;
 run;
 
 
-/*ТУТ ДОПИСАТЬ ПРОВЕРКУ ТАЙМЛАЙНА*/
-
 
 /*прочесываем созданную таблицу, для каждой последней записи загоняем смену на дексаметазон, и номер этапа. Последнюю выводим в датасет*/
 data &LN..new_pt &LN..error_timeline /*(keep=)*/;
     set &LN..new_et;
     by pguid;
-    retain ec   d_ch faza time_error ; *ec -- это количество этапов "свернутых";
+    retain ec   d_ch faza time_error induct_b induct_e; *ec -- это количество этапов "свернутых";
     if first.pguid then do;  ec = 0;  end;
 /*--------------------------------------------------*/
     if it2 then ec + 1;
@@ -215,6 +229,10 @@ data &LN..new_pt &LN..error_timeline /*(keep=)*/;
     if ph_b > lastdate then do; lastdate = ph_b; time_error = 1; end;
     if ph_e > lastdate and time_error = 0 then do; lastdate = ph_e; end;
 	if ph_e > lastdate then do; lastdate = ph_e; time_error = 1; end;
+	
+	/*вылавливаем индукцию*/
+	if 
+
 
     if new_smena_na_deksamet = 1 then
         do;
@@ -318,6 +336,7 @@ data &LN..new_ev;
     by pguid;
 run;
 /*  rel ремиссия = 1 */
+/*  res резистентность = 2*/
 /*  death Смерть = 3*/
 /*  rem рецедив = 5*/
 
@@ -326,15 +345,31 @@ run;
 data &LN..new_pt;
     set &LN..new_ev;
     by pguid;
-    retain i_rem date_rem /**/ i_death date_death /**/ i_rel date_rel /**/ Laspot;
-    if first.pguid then do; i_rel = 0; date_rel = .; /**/ i_death = 0; date_death = .; /**/ i_rem = 0; date_rem = .; Laspot = 0; end;
+    retain i_rem date_rem /**/ i_death date_death /**/ i_rel date_rel /**/ i_res date_res /**/ Laspot;
+    if first.pguid then 
+		do; 
+			i_rel = 0; date_rel = .;  
+			i_res = 0; date_res = .; 
+			i_death = 0; date_death = .; 
+			i_rem = 0; date_rem = .; 
+			Laspot = 0; 
+		end;
 /*----------------------------------*/
     if new_event = 1 then do; i_rem = 1; date_rem = new_event_date; end;
+	if new_event = 2 then do; i_res = 1; date_res = new_event_date; end;
     if new_event = 3 then do; i_death = 1; date_death = new_event_date; end;
     if new_event = 5 then do; i_rel = 1; date_rel = new_event_date; end;
 	if new_aspor_otmena = 1 then laspot = 1;
 /*---------------------------------*/
-    if last.pguid then do; output; i_rel = 0; date_rel = .; /**/ i_death = 0; date_death = .; /**/ i_rem = 0; date_rem = .; Laspot = 0; end;
+    if last.pguid then 
+		do; 
+			output; 
+			i_rel = 0; date_rel = .; 
+			i_res = 0; date_res = .; 
+			i_death = 0; date_death = .; 
+			i_rem = 0; date_rem = .; 
+			Laspot = 0; 
+		end;
 run;
 
 
@@ -387,6 +422,8 @@ Data &LN..new_pt;
     end;
 run;
 
+/*Смерть в индукции*/
+/*отобрать индук*/
 
 
 /*-----------------------------------------------------------------------------------------------------------*/
@@ -441,7 +478,7 @@ run;
 
 data ift; *исключаем из анализа имунофенотипа "неизвестно" и бифенотипический;
 	set &LN..all_pt;
-	if oll_class in {1,2} then output;
+	if oll_class in (1,2) then output;
 run;
 
 proc freq data=ift ;
@@ -737,6 +774,17 @@ run;
 *%eventan (&LN..new_pt, TRF, iRF, 0,F,&y,age,age_group_f.,"Стратификация по возрасту");
 
 
+/*data AYA;*/
+/*	set &LN..new_pt;*/
+/*	if age < 30 then output;*/
+/*run;*/
+
+/*data adult;*/
+
+proc freq data = &LN..new_pt;
+	table age;
+	format age age_group_f.;
+run;
 
 /*-----------------------------------------------------------------------------------------------------------*/
 /*-----------------------------------------------------------------------------------------------------------*/
