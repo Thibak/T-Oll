@@ -231,7 +231,7 @@ data &LN..new_pt &LN..error_timeline /*(keep=)*/;
 	if ph_e > lastdate then do; lastdate = ph_e; time_error = 1; end;
 	
 	/*вылавливаем индукцию*/
-	if 
+/*	if */
 
 
     if new_smena_na_deksamet = 1 then
@@ -450,7 +450,7 @@ run;
 footnote " ";
 
 proc means data = &LN..all_pt N;
-	var pguid;
+	var new_birthdate;
    title 'Всего записей';
 run;
 
