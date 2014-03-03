@@ -90,6 +90,7 @@ proc format;
 	value time_error_f . = "нет ошибок" 0 = "дата последнего визита не заполнена" 1 = "дата последнего события (этапа) больше чем дата последнего контакта";
 	value new_group_risk_f 1 = "стандартная" 2 = "высокая";
 	value y_n 0 = "нет" 1 = "да";
+	value au_al_f 1 = "ауто" 2 = "алло - родственная" ;
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -360,7 +361,7 @@ data &LN..new_pt;
 			i_rel = 0; date_rel = .;  
 			i_res = 0; date_res = .; 
 			i_death = 0; date_death = .; i_ind_death = 0; 
-			i_tkm = 0; date_tkm = .; tkm_au_al = .;
+			i_tkm = 0; date_tkm = .; tkm_au_al = 0;
 			i_rem = 0; date_rem = .; 
 			Laspot = 0; 
 		end;
@@ -370,8 +371,8 @@ data &LN..new_pt;
     if new_event = 3 then do; i_death = 1; date_death = new_event_date; 
 		if new_event_txt = "В индукции" then i_ind_death = 1; end;
 	if new_event = 4 then do; i_tkm = 1; date_tkm = new_event_date;
-			if new_event_txt = "ауто" then tkm_au_al = 0; 
-			if new_event_txt = "алло - родственная" then tkm_au_al = 1;
+			if new_event_txt = "ауто" then tkm_au_al = 1; 
+			if new_event_txt = "алло - родственная" then tkm_au_al = 2;
 			end;
     if new_event = 5 then do; i_rel = 1; date_rel = new_event_date; end;
 	if new_aspor_otmena = 1 then laspot = 1;
@@ -382,7 +383,7 @@ data &LN..new_pt;
 			i_rel = 0; date_rel = .; 
 			i_res = 0; date_res = .; 
 			i_death = 0; date_death = .; i_ind_death = 0; 
-			i_tkm = 0; date_tkm = .; tkm_au_al = .;
+			i_tkm = 0; date_tkm = .; tkm_au_al = 0;
 			i_rem = 0; date_rem = .; 
 			Laspot = 0; 
 		end;
@@ -516,6 +517,7 @@ run;
 
 proc freq data = &LN..new_pt;
 	table i_tkm*tkm_au_al;
+	format tkm_au_al au_al_f.;
 run;
 
 /**/
