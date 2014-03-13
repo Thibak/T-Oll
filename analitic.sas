@@ -68,8 +68,8 @@ output;
    stop;
    keep tit1 tit2;
 run;
-title1 &ttl;
-title2 " зависимая:  &tt1 // фактор       :  &tt2";
+title2 &ttl;
+title3 " зависимая:  &tt1 // фактор       :  &tt2";
 ods graphics on;
 ods exclude WilHomCov LogHomCov HomStats  Quartiles ProductLimitEstimates; *;
 proc lifetest data=&dat plots =(s( &s &cl))  method=pl ;
@@ -287,7 +287,7 @@ data &LN..new_pt /*(keep=)*/;
 /*---------------------------------------------------*/
     if last.pguid then
         do;
-			if time_error ne . then output &LN..error_timeline;
+			*if time_error ne . then output &LN..error_timeline;
 
             output &LN..new_pt;
             d_ch = 0;
@@ -550,16 +550,6 @@ proc freq data=&LN..all_pt ORDER = DATA;
    title 'Иммунофенотип (детально)';
 run;
 
-proc freq data=&LN..all_pt ; *информация о количестве (без процентов);
-   tables oll_class / nocum NOPERCENT;
-   title 'Иммунофенотип';
-   FORMAT oll_class oc_f.;
-run;
-
-data ift; *исключаем из анализа имунофенотипа "неизвестно" и бифенотипический;
-	set &LN..all_pt;
-	if oll_class in (1,2) then output;
-run;
 
 proc freq data=ift ;
    tables oll_class / nocum;
@@ -567,29 +557,6 @@ proc freq data=ift ;
    FORMAT oll_class oc_f.;
 run;
 
-/*============= тут переделать для таблички 2х2 =============*/
-
-data ift_b; *подробно для B-OLL;
-	set &LN..all_pt;
-	if oll_class = 1 then output;
-run;
-
-proc freq data=ift_b ORDER = DATA;
-   tables new_oll_classname / nocum;
-   title 'Иммунофенотип / подробно для B-OLL';
-   FORMAT oll_class oc_f.;
-run;
-
-data ift_t; *подробно для T-OLL;
-	set &LN..all_pt;
-	if oll_class = 2 then output;
-run;
-
-proc freq data=ift_t ORDER = DATA ;
-   tables new_oll_classname / nocum;
-   title 'Иммунофенотип / подробно для T-OLL';
-   FORMAT oll_class oc_f.;
-run;
 
 /*==============================*/
 
@@ -713,16 +680,6 @@ proc freq data=&LN..new_pt ;
    format new_group_risk new_group_risk_f. d_ch y_n.;
 run;
 
-/*-----------непонятный  рудимент -----------------*/
-
-/*proc freq data=&LN..all_et;*/
-/*    tables*/
-/*new_etap_protokolname*/
-/*        /nocum;*/
-/*    title 'Всего проведено этапов';*/
-/*run;*/
-/*--------------------------------------------------*/
-
 
 
 /*-----------------------------------------------------------------------------------------------------------*/
@@ -757,8 +714,7 @@ run;
 %eventan (&LN..tmp, TRF, iRF, 0,,&y,oll_class,oc_f.,"стратификация по нозологиям. Безрецидивная выживаемость");
 %eventan (&LN..tmp, Trel, i_rel, 0,F,&y,oll_class,oc_f.,"Стратификация по нозологиям. Вероятность развития рецидива"); *вероятность развития рецидива;
 
-*%eventan (&LN..tmp, TLive, i_death, 0,F,&y,oll_class,oc_f.,"стратификация по нозологиям");
-*%eventan (&LN..tmp, TRF, iRF, 0,F,&y,oll_class,oc_f.,"стратификация по нозологиям");
+
 
 /*---------------- стратификация по кариотипу -----------------*/
 
@@ -771,98 +727,6 @@ run;
 %eventan (&LN..new_pt, TRF, iRF, 0,,&y,new_normkariotipname,,"Стратификация по кариотипу. Безрецидивная выживаемость");
 %eventan (&LN..new_pt, Trel, i_rel, 0,F,&y,new_normkariotipname,,"Стратификация по кариотипу Вероятность развития рецидива"); *вероятность развития рецидива;
 
-
-*%eventan (&LN..new_pt, TLive, i_death, 0,F,&y,new_normkariotipname,,"стратификация по кариотипу");
-*%eventan (&LN..new_pt, TRF, iRF, 0,F,&y,new_normkariotipname,,"стратификация по кариотипу");
-
-
-/*по группам риска*/
-/*%eventan (&LN..new_pt, TLive, i_death, 0,,&y,new_group_risk,risk_f.,"по группам риска");*/
-/*%eventan (&LN..new_pt, TRF, iRF, 0,,&y,new_group_risk,risk_f.,"по группам риска");*/
-/*%eventan (&LN..new_pt, TLive, i_death, 0,F,&y,new_group_risk,risk_f.,"по группам риска");*/
-/*%eventan (&LN..new_pt, TRF, iRF, 0,F,&y,new_group_risk,risk_f.,"по группам риска");*/
-
-/*анализ в стандартной группе риска*/
-/*data  &LN..tmp;*/
-/*  set &LN..new_pt;*/
-/*  if (new_group_risk = 1) then output;*/
-/*run;*/
-/**/
-/*%eventan (&LN..tmp, TLive, i_death, 0,,&y,d_ch,1.0,"Стандартная группа риска");*/
-/*%eventan (&LN..tmp, TRF, iRF, 0,,&y,d_ch,1.0,"Стандартная группа риска");*/
-/*%eventan (&LN..tmp, TLive, i_death, 0,F,&y,d_ch,1.0,"Стандартная группа риска");*/
-/*%eventan (&LN..tmp, TRF, iRF, 0,F,&y,d_ch,1.0,"Стандартная группа риска");*/
-
-/*,"Высокая группа риска"*/
-/*data  &LN..tmp;*/
-/*  set &LN..new_pt;*/
-/*  if (new_group_risk = 2) then output;*/
-/*run;*/
-/**/
-/*%eventan (&LN..tmp, TLive, i_death, 0,,&y,d_ch,1.0,"Высокая группа риска");*/
-/*%eventan (&LN..tmp, TRF, iRF, 0,,&y,d_ch,1.0,"Высокая группа риска");*/
-/*%eventan (&LN..tmp, TLive, i_death, 0,F,&y,d_ch,1.0,"Высокая группа риска");*/
-/*%eventan (&LN..tmp, TRF, iRF, 0,F,&y,d_ch,1.0,"Высокая группа риска");*/
-
-/*В-клеточный ОЛЛ*/
-data  &LN..tmp;
-    set &LN..new_pt;
-    if (oll_class = 1); *B-клеточный ОЛЛ.;
-run;
-
-%eventan (&LN..tmp, TLive, i_death, 0,,&y,new_normkariotipname,,"В-клеточный ОЛЛ. Стратификация по кариотипу. Общая выживаемость.");
-%eventan (&LN..tmp, TRF, iRF, 0,,&y,new_normkariotipname,,"В-клеточный ОЛЛ. Стратификация по кариотипу. Безрецидивная выживаемость.");
-%eventan (&LN..tmp, Trel, i_rel, 0,F,&y,new_normkariotipname,,"В-клеточный ОЛЛ. Стратификация по кариотипу. Вероятность развития рецидива"); *вероятность развития рецидива;
-
-/*Т-клеточный ОЛЛ*/
-data  &LN..tmp; 
-    set &LN..new_pt;
-    if (oll_class = 2); *T-клеточный ОЛЛ.;
-run;
-
-%eventan (&LN..tmp, TLive, i_death, 0,,&y,new_normkariotipname,,"T-клеточный ОЛЛ.Стратификация по кариотипу. Общая выживаемость.");
-%eventan (&LN..tmp, TRF, iRF, 0,,&y,new_normkariotipname,,"Т-клеточный ОЛЛ. Стратификация по кариотипу. Безрецидивная выживаемость.");
-%eventan (&LN..tmp, Trel, i_rel, 0,F,&y,new_normkariotipname,,"T-клеточный ОЛЛ. Стратификация по кариотипу. Вероятность развития рецидива"); *вероятность развития рецидива;
-
-/*В возростной группе до 35*/
-/*data  &LN..tmp;*/
-/*  set &LN..new_pt;*/
-/*  if (age < 35) then output;*/
-/*run;*/
-/**/
-/*%eventan (&LN..tmp, TLive, i_death, 0,,&y,d_ch,1.0,"В возростной группе до 35");*/
-/*%eventan (&LN..tmp, TRF, iRF, 0,,&y,d_ch,1.0,"В возростной группе до 35");*/
-/*%eventan (&LN..tmp, TLive, i_death, 0,F,&y,d_ch,1.0,"В возростной группе до 35");*/
-/*%eventan (&LN..tmp, TRF, iRF, 0,F,&y,d_ch,1.0,"В возростной группе до 35");*/
-
-/*В возростной группе старше 35*/
-/*data  &LN..tmp;*/
-/*  set &LN..new_pt;*/
-/*  if (age < 35) then output;*/
-/*run;*/
-/**/
-/*%eventan (&LN..tmp, TLive, i_death, 0,,&y,d_ch,1.0,"В возростной группе старше 35");*/
-/*%eventan (&LN..tmp, TRF, iRF, 0,,&y,d_ch,1.0,"В возростной группе старше 35");*/
-/*%eventan (&LN..tmp, TLive, i_death, 0,F,&y,d_ch,1.0,"В возростной группе старше35");*/
-/*%eventan (&LN..tmp, TRF, iRF, 0,F,&y,d_ch,1.0,"В возростной группе старше 35");*/
-/**/
-
-/*Стратификация по возрасту*/
-%eventan (&LN..new_pt, TLive, i_death, 0,,&y,age,age_group_f.,"Стратификация по возрасту. Общая выживаемость");
-%eventan (&LN..new_pt, TRF, iRF, 0,,&y,age,age_group_f.,"Стратификация по возрасту. Безрецидивная выживаемость");
-%eventan (&LN..new_pt, Trel, i_rel, 0,F,&y,age,age_group_f.,"Стратификация по возрасту. Вероятность развития рецидива"); *вероятность развития рецидива;
-
-
-*%eventan (&LN..new_pt, TLive, i_death, 0,F,&y,age,age_group_f.,"Стратификация по возрасту");
-*%eventan (&LN..new_pt, TRF, iRF, 0,F,&y,age,age_group_f.,"Стратификация по возрасту");
-
-
-/*data AYA;*/
-/*	set &LN..new_pt;*/
-/*	if age < 30 then output;*/
-/*run;*/
-
-/*data adult;*/
 
 
 /*регион москва 21C015D6-BF19-E211-B588-10000001B347 or Москва г*/
@@ -883,149 +747,5 @@ run;
 
 
 
-/*-----------------------------------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------------------------------*/
-/*-------------------------------------------------- запуск модулей  ----------------------------------------*/
-/*-----------------------------------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------------------------------*/
 
-/*1. репортинг состояния базы*/
-/*2. репортинг ошибок*/
-/*3. описательная статистика*/
-/*4. анализ выживаемости*/
-
-/*data a;*/
-/*	set &LN..new_pt;*/
-/*	if Trel > 30 and oll_class = 2 then output;*/
-/*/*	if pguid = "BF9718B0-AD79-E211-A54D-10000001B347" then output;*/*/
-/*run;*/
-
-/*proc print data = a;*/
-/*run;*/
-
-
-
-
-
-/*VVVVVVVVVVVVVVVVVVVVVVVVV   не разобрано    VVVVVVVVVVVVVVVVVVVVVVVVVV*/
-
-/*data &LN..fr;*/
-/*    set &LN..new_pt;*/
-/*    if new_etap_protokol = 3 then output;*/
-/*run;*/
-/**/
-/*proc means data=&LN..new_pt N median mean max min;*/
-/*   var  new_blast_km;*/
-/*   title 'бластов в КМ';*/
-/*run;*/
-/**/
-/**/
-/*data &LN..fr;*/
-/*    set &LN..new_pt;*/
-/*    if new_etap_protokol = 3 AND new_blast_km > 5 then output;*/
-/*run;*/
-/**/
-/*proc means data=&LN..fr N median mean max min;*/
-/*   var  new_blast_km;*/
-/*   title 'бластов в КМ > 5%';*/
-/*run;*/
-/**/
-/*proc freq data=&LN..fr;*/
-/*    tables new_gendercodename*oll_class /nocum;*/
-/*    title 'Анализ пунктатов КМ на 70 день терапии';*/
-/*run;*/
-/**/
-/*/*присоединяем все этапы к пациентам*/*/
-/**/
-/*proc sort data=&LN..all_pr;*/
-/*    by pguid;*/
-/*run;*/
-/**/
-/*proc sort data=&LN..all_et;*/
-/*    by pguid;*/
-/*run;*/
-/**/
-/*data &LN..RoI;*/
-/*    merge &LN..all_pr &LN..all_et ;*/
-/*    by pguid;*/
-/*run;*/
-/**/
-/*/*Создаем промежутки этапов 1-2 этапов индукции*/*/
-/*data &LN..RoI;*/
-/*    set &LN..RoI;*/
-/*    by pguid;*/
-/*    retain TP1-TP4 ;*/
-/*    if first.pguid then do; TP1 = .; TP2 = .; TP3 = .; TP4 = .; end;*/
-/*/*--------------------------------------------------*/*/
-/*    if new_etap_protokol = 2 then do; TP1 = ph_b; TP2 = ph_e; end;*/
-/*    if new_etap_protokol = 3 then do; TP3 = ph_b; TP4 = ph_e; end;*/
-/*    if TP4 = . then TP4 = DATE();*/
-/*/*---------------------------------------------------*/*/
-/*    if last.pguid then*/
-/*        do;*/
-/*            output;*/
-/*        TP1 = .; TP2 = .; TP3 = .; TP4 = .;*/
-/*        end;*/
-/*run;*/
-/**/
-/**/
-/*/*подцепляем события, определяем произошли ли они в промежутках, составляем таблицу*/*/
-/**/
-/*proc sort data=&LN..RoI;*/
-/*    by pguid;*/
-/*run;*/
-/**/
-/*proc sort data=&LN..all_ev;*/
-/*    by pguid;*/
-/*run;*/
-/**/
-/*data &LN..RoI;*/
-/*    merge &LN..RoI &LN..all_ev ;*/
-/*    by pguid;*/
-/*run;*/
-/**/
-/*data &LN..RoI;*/
-/*    set &LN..RoI;*/
-/*    by pguid;*/
-/*    retain event ev_date;*/
-/*    if first.pguid then do; event = 4; ev_date = .; end;*/
-/*/*--------------------------------------------------*/*/
-/*    if TP1 <= new_event_date AND new_event_date <= TP4 then do;*/
-/*        ev_date = new_event_date;*/
-/*        if new_event in (1,2,3) then event = new_event;*/
-/*        /*if new_event = 1 then do; event = 1 ; end; *полная ремиссия;*/
-/*        if new_event = 2 then do; event = 2 ; end; *Резистивность;*/
-/*        if new_event = 3 then do; event = 3 ; end; *смерть;*/
-/*        */*/
-/*    end;*/
-/**else event = 4; *резистентность;*/
-/*/*---------------------------------------------------*/*/
-/*    if last.pguid then*/
-/*        do;*/
-/*            output;*/
-/*        event = .;*/
-/*        ev_date = .;*/
-/*        end;*/
-/*run;*/
-/*proc freq data=&LN..RoI;*/
-/*    tables event*oll_class /nocum;*/
-/*    title 'ПР';*/
-/*run;*/
-/**/
-/*data &LN..tmp;*/
-/*	set &LN..All_pr;*/
-/*	if new_ldh ne then; */
-/*	do;*/
-/*		if new_ldh > 400 then ldg = 1; else ldg = 0;*/
-/*		output;*/
-/*	end;*/
-/*run;*/
-/**/
-/*proc freq data=&LN..tmp;*/
-/*	tables ldg*oll_class /nocum;*/
-/*run;*/
-/*	*/
-/*%eventan (&LN..new_pt, TRF, iRF, 0,,&y,Laspot,,"В зависимости от отмены L-аспоргиназы");*/
-/**/
-/**/
 
