@@ -4,7 +4,7 @@
 /***********************************************************************************************************/
 /*****************                                                                       *******************/
 /****************                      Отчет по протоколу ОЛЛ-2009                        ******************/
-/*****************                           Только по Т-ОЛЛ                             *******************/
+/*****************                                                                       *******************/
 /***********************************************************************************************************/
 /***********************************************************************************************************/
 /***********************************************************************************************************/
@@ -18,9 +18,9 @@
 	%do;
 		%let disk = D; *sony;
 	%end;
-%else/*%if &sysscpl = "W32_7PRO" %then */ 
+%if &sysscpl = X64_7PRO %then 
 	%do;
-		%let disk = Z; *остальные;
+		%let disk = Z; *работа;
 	%end;
 %mend;
 
@@ -71,7 +71,7 @@ run;
 title1 &ttl;
 title2 " зависимая:  &tt1 // фактор       :  &tt2";
 ods graphics on;
-ods exclude WilHomCov LogHomCov HomStats  Quartiles; *ProductLimitEstimates;
+ods exclude WilHomCov LogHomCov HomStats  Quartiles ProductLimitEstimates; *;
 proc lifetest data=&dat plots =(s( &s &cl))  method=pl ;
     %if &f ne %then %do; strata &f/test=logrank;
     id &f;format   &f &for;%end;
@@ -89,11 +89,17 @@ proc format;
     value age_group_f low-30 = "до 30-ти лет" 30-high = "после 30-ти лет";
 	value tkm_f 0="нет" 1="ауто" 2="алло";
 	value it_f 1="есть" 0 = "нет";
-	value time_error_f . = "нет ошибок" 0 = "дата последнего визита не заполнена" 1 = "дата последнего события (этапа) больше чем дата последнего контакта";
+	value time_error_f . = "нет ошибок" 
+		0 = "дата последнего визита не заполнена" 
+		1 = "дата последнего события (этапа) больше чем дата последнего контакта" 
+		2 = "дата ремиссии больше даты последнего контакта" 
+		3 = "дата рецедива больше даты последнего контакта";
+/*	  if date_rem > lastdate then do; time_error = 2; lastdate = date_rem; end;*/
+/*    if date_rel > lastdate then do; time_error = 3; lastdate = date_rel; end;*/
 	value new_group_risk_f 1 = "стандартная" 2 = "высокая";
 	value y_n 0 = "нет" 1 = "да";
 	value au_al_f 1 = "ауто" 2 = "алло - родственная" ;
-	value trmnt_outkm_f 0 = "Полная ремиссия" 1 = "Смерть в индукции" 2 = "Резистентность";
+	value reg_f 0 = "Регионы" 1 = "ГНЦ"; 
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -121,6 +127,14 @@ data &LN..all_et;
         new_protokol = pguid
 		new_group_risk = fin_group_risk
 		new_group_riskname = fin_group_riskname
+		ownerid = ownerid_et
+		owneridname = owneridname_et	
+		createdby = createdby_et
+		createdbyname	= createdbyname_et
+		createdon	= createdon_et
+		Modifiedby	= Modifiedby_et
+		Modifiedbyname	= Modifiedbyname_et
+		Modifiedon = Modifiedon_et
         ;
 		run;
 data &LN..all_ev;
@@ -128,6 +142,14 @@ data &LN..all_ev;
     rename
         new_protokol_oll = pguid
         new_protokol_ollname = name
+		ownerid = ownerid_ev
+		owneridname = owneridname_ev	
+		createdby = createdby_ev
+		createdbyname	= createdbyname_ev
+		createdon	= createdon_ev
+		Modifiedby	= Modifiedby_ev
+		Modifiedbyname	= Modifiedbyname_ev
+		Modifiedon = Modifiedon_ev
     ;
 	run;
 /*------ цензурирование, и вычисление производных показателей ----------*/
@@ -173,12 +195,13 @@ data &LN..all_pt;
 run;
 
 
+
 data &LN..all_pt; *только по таблице пациентов;
     set &LN..all_pt;
 
 	if new_group_risk = 3 then new_group_risk = .; * 3 -- код для "нет данных", что равноценно отсутствию данных!;
 
-/*пока обнуляем возраст, потом будем перезабивать*/
+
 
 if age = . then age = floor(yrdif(new_birthdate, pr_b,'AGE'));  *если возраста нет в базе ЕН, то предположительно в базе АС дата рождения забита правильно;
     *FORMAT age 2.0;
@@ -219,7 +242,7 @@ run;
 
 
 /*прочесываем созданную таблицу, для каждой последней записи загоняем смену на дексаметазон, и номер этапа. Последнюю выводим в датасет*/
-data &LN..new_pt &LN..error_timeline /*(keep=)*/;
+data &LN..new_pt /*(keep=)*/;
     set &LN..new_et;
     by pguid;
     retain ec   d_ch faza time_error induct_b induct_e; *ec -- это количество этапов "свернутых";
@@ -241,9 +264,9 @@ data &LN..new_pt &LN..error_timeline /*(keep=)*/;
 /*---------------------------------------------------*/
     if last.pguid then
         do;
-*            if it1 = 1 and it2 = 1 then; *этапы мне безразличны;
-output &LN..new_pt;
 			if time_error ne . then output &LN..error_timeline;
+
+            output &LN..new_pt;
             d_ch = 0;
             faza = .;
 			time_error = .;
@@ -283,27 +306,6 @@ run;
 /*----------------------------------------------------------------------------------------*/
 
 
-
-/*------------тут нужно будет подцепить заплатку возрастов----------*/
-/*------------------------------------------------------------------*/
-
-
-
-/*------ все проверки проведены, делаем вывод записей содержащих ошибки ------------*/
-
-proc sort data = &LN..error_timeline;
-	by pt_id;
-run;
-
-proc print data = &LN..error_timeline split='*' N;
-	var pt_id name time_error;
-	label pt_id = 'Номер пациента*в протоколе'
-          name = 'Имя*в базе пациентов'
-		  time_error = "Ошибки";
-	title "ошибки заполнения таймлайна" ;
-	footnote '*дата последнего визита обнавлена в соответствии с имеющейся информацией о лечении'; 
-	format  it1 it2 it_f. time_error time_error_f. ; 
-run;
 
 
 
@@ -386,27 +388,33 @@ data &LN..new_pt;
 run;
 
 
+	
+
 /*поставить заплатку если время рецидива равно нулю то сегодняшняя дата <----------- ЕСТЬ ЛИ ЭТО????*/
 /*обновление последнего контакта за счет смерти*/
 Data &LN..new_pt;
     set &LN..new_pt;
-    if date_rem > lastdate then lastdate = date_rem;
-    if date_death > lastdate then lastdate = date_death;
-    if date_rel > lastdate then lastdate = date_rel;
+	if time_error = . then 
+		do;
+    	if date_rem > lastdate then time_error = 2;
+    	if date_rel > lastdate then time_error = 3;
+		end;
+
+    if date_rem > lastdate then lastdate = date_rem; 
+    if date_death ne .     then lastdate = date_death; 
+    if date_rel > lastdate then lastdate = date_rel; 
+
+	if i_death = 1 and time_error = 0 then time_error = .;
     /*ЗАПЛАТКА*/
     *lastdate = MDY(9,1,2013);
 run;
 
-*Исход лечения. Переменная trmnt_outkm;
-*value trmnt_outkm_f 0 = "Полная ремиссия" 1 = "Смерть в индукции" 2 = "Резистентность";;
-Data &LN..new_pt;
+/*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+data &LN..error_timeline;
 	set &LN..new_pt;
-	*trmnt_outkm = .;
-	select (i_res);
-		when (1) trmnt_outkm = 1;
-		when (0) 
-
-
+	if time_error ne . then output;
+run;
 
 /*Выживаемость*/
 /*переводим в месяцы*/
@@ -444,7 +452,25 @@ Data &LN..new_pt;
     end;
 run;
 
+/*Смерть в индукции*/
+/*отобрать индук*/
 
+/*------ все проверки проведены, делаем вывод записей содержащих ошибки ------------*/
+
+proc sort data = &LN..error_timeline;
+	by pt_id;
+run;
+
+
+proc print data = &LN..error_timeline split='*' N;
+	var pt_id name time_error;
+	label pt_id = 'Номер пациента*в протоколе'
+          name = 'Имя*в базе пациентов'
+		  time_error = "Ошибки";
+	title "ошибки заполнения таймлайна" ;
+	footnote '*дата последнего визита обнавлена в соответствии с имеющейся информацией о лечении'; 
+	format  it1 it2 it_f. time_error time_error_f. ; 
+run;
 
 /*-----------------------------------------------------------------------------------------------------------*/
 /*-----------------------------------------------------------------------------------------------------------*/
@@ -469,25 +495,6 @@ run;
 
 footnote " ";
 
-*--------------------------------------------------------------------------------------------------;
-*--------------------------------------------------------------------------------------------------;
-*--------------------------------------------------------------------------------------------------;
-*--------------------------------------------------------------------------------------------------;
-*-----------------------------        Вынимаем только Т-ОЛЛ           -----------------------------;
-*--------------------------------------------------------------------------------------------------;
-*--------------------------------------------------------------------------------------------------;
-
-/*data &LN..all_pt;*/
-/*	set &LN..all_pt;*/
-/*    if (oll_class = 2) then output;*/
-/*run;*/
-/**/
-
-
-*--------------------------------------------------------------------------------------------------;
-*--------------------------------------------------------------------------------------------------;
-
-
 
 
 
@@ -507,7 +514,11 @@ proc freq data=&LN..all_pt ;
    title 'пол';
 run;
 
-proc freq data=&LN..all_pt ;
+proc sort data=&LN..all_pt;
+	by new_oll_class;
+run;
+
+proc freq data=&LN..all_pt ORDER = DATA;
    tables new_oll_classname / nocum;
    title 'Иммунофенотип (детально)';
 run;
@@ -536,18 +547,18 @@ data ift_b; *подробно для B-OLL;
 	if oll_class = 1 then output;
 run;
 
-proc freq data=ift_b ;
+proc freq data=ift_b ORDER = DATA;
    tables new_oll_classname / nocum;
    title 'Иммунофенотип / подробно для B-OLL';
    FORMAT oll_class oc_f.;
 run;
 
-data ift_b; *подробно для T-OLL;
+data ift_t; *подробно для T-OLL;
 	set &LN..all_pt;
 	if oll_class = 2 then output;
 run;
 
-proc freq data=ift_b ;
+proc freq data=ift_t ORDER = DATA ;
    tables new_oll_classname / nocum;
    title 'Иммунофенотип / подробно для T-OLL';
    FORMAT oll_class oc_f.;
@@ -724,9 +735,10 @@ run;
 
 /*---------------- стратификация по кариотипу -----------------*/
 
-proc print data = &LN..new_pt;
-	var pt_id name new_normkariotipname;
-run; 
+proc freq data = &LN..new_pt;
+	table new_normkariotipname;
+run;
+
 
 %eventan (&LN..new_pt, TLive, i_death, 0,,&y,new_normkariotipname,,"Стратификация по кариотипу. Выживаемость");
 %eventan (&LN..new_pt, TRF, iRF, 0,,&y,new_normkariotipname,,"Стратификация по кариотипу. Безрецидивная выживаемость");
@@ -768,19 +780,21 @@ run;
 /*В-клеточный ОЛЛ*/
 data  &LN..tmp;
     set &LN..new_pt;
-    if (oll_class = 1) then output;
+    if (oll_class = 1) then output; *B-клеточный ОЛЛ.;
 run;
 
-%eventan (&LN..tmp, TLive, i_death, 0,,&y,new_normkariotipname,,"В-клеточный ОЛЛ. Общая выживаемость");
+%eventan (&LN..tmp, TLive, i_death, 0,,&y,new_normkariotipname,,"В-клеточный ОЛЛ. Стратификация по кариотипу. Общая выживаемость.");
+%eventan (&LN..tmp, TRF, iRF, 0,,&y,new_normkariotipname,,"В-клеточный ОЛЛ. Стратификация по кариотипу. Безрецидивная выживаемость.");
 %eventan (&LN..tmp, Trel, i_rel, 0,F,&y,new_normkariotipname,,"В-клеточный ОЛЛ. Стратификация по кариотипу. Вероятность развития рецидива"); *вероятность развития рецидива;
 
 /*Т-клеточный ОЛЛ*/
-data  &LN..tmp;
+data  &LN..tmp; 
     set &LN..new_pt;
-    if (oll_class = 2) then output;
+    if (oll_class = 2) then output; *T-клеточный ОЛЛ.;
 run;
 
-%eventan (&LN..tmp, TLive, i_death, 0,,&y,new_normkariotipname,,"T-клеточный ОЛЛ. Общая выживаемость");
+%eventan (&LN..tmp, TLive, i_death, 0,,&y,new_normkariotipname,,"T-клеточный ОЛЛ.Стратификация по кариотипу. Общая выживаемость.");
+%eventan (&LN..tmp, TRF, iRF, 0,,&y,new_normkariotipname,,"Т-клеточный ОЛЛ. Стратификация по кариотипу. Безрецидивная выживаемость.");
 %eventan (&LN..tmp, Trel, i_rel, 0,F,&y,new_normkariotipname,,"T-клеточный ОЛЛ. Стратификация по кариотипу. Вероятность развития рецидива"); *вероятность развития рецидива;
 
 /*В возростной группе до 35*/
@@ -822,6 +836,23 @@ run;
 /*run;*/
 
 /*data adult;*/
+
+
+/*регион москва 21C015D6-BF19-E211-B588-10000001B347 or Москва г*/
+data  tmp;
+    set &LN..new_pt;
+	reg = 0;
+    if (ownerid = "51362F93-2C7B-E211-A54D-10000001B347") then reg=1; *Ахмерзаева Залина Хатаевна;
+run;
+
+proc freq data = tmp;
+	table reg;
+run;
+
+%eventan (tmp, TLive, i_death, 0,,&y,reg,reg_f.,"ГНЦ vs регионы. Общая выживаемость");
+%eventan (tmp, TRF, iRF, 0,,&y,reg,reg_f.,"ГНЦ vs регионы. Безрецидивная выживаемость");
+%eventan (tmp, Trel, i_rel, 0,F,&y,reg,reg_f.,"ГНЦ vs регионы. Вероятность развития рецидива"); *вероятность развития рецидива;
+
 
 
 
