@@ -102,6 +102,7 @@ proc format;
 	value reg_f 0 = "Регионы" 1 = "ГНЦ"; 
 	value T_class12_f 0 = "T1+T2" 1 = "T3" 2 = "T4";
 	value T_class124_f 0 = "T1+T2+T4" 1 = "T3";
+	value TR_f 0 = "Полная ремиссия" 1 = "Смерть в индукции" 2 = "Резистентная форма";
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -391,12 +392,11 @@ data &LN..new_pt;
 /*----------------------------------*/
     if new_event = 1 then do; i_rem = 1; date_rem = new_event_date; end;
 	if new_event = 2 then do; i_res = 1; date_res = new_event_date; end;
-    if new_event = 3 then do; i_death = 1; date_death = new_event_date; 
-		if new_event_txt = "В индукции" then i_ind_death = 1; end;
-	if new_event = 4 then do; i_tkm = 1; date_tkm = new_event_date;
-			if new_event_txt = "ауто" then tkm_au_al = 1; 
-			if new_event_txt = "алло - родственная" then tkm_au_al = 2;
-			end;
+    if new_event = 3 then do; i_death = 1; date_death = new_event_date; end;
+	 if new_event_txt = "В индукции" then i_ind_death = 1; 
+	if new_event = 4 then do; i_tkm = 1; date_tkm = new_event_date; end;
+	 if new_event_txt = "ауто" then tkm_au_al = 1; 
+	 if new_event_txt = "алло - родственная" then tkm_au_al = 2;
     if new_event = 5 then do; i_rel = 1; date_rel = new_event_date; end;
 	if new_aspor_otmena = 1 then laspot = 1;
 /*---------------------------------*/
@@ -487,8 +487,8 @@ Data &LN..new_pt;
     select (new_oll_class);
         when (5) do; T_class12 = 0 ; T_class124 = 0 ; end;  *T1;
 		when (6) do; T_class12 = 0 ; T_class124 = 0 ; end; *T2;
-		when (7) do; T_class12 = 3 ; T_class124 = 1; end; *T3;
-		when (8) do; T_class12 = 4 ; T_class124 = 0; end; *T4;
+		when (7) do; T_class12 = 1 ; T_class124 = 1; end; *T3;
+		when (8) do; T_class12 = 2 ; T_class124 = 0; end; *T4;
         otherwise;
     end;
 	label T_class12 = "Классификация ОЛЛ ";
@@ -498,7 +498,15 @@ run;
 *---------        Исход лечения         ---------;
 
 
-
+Data &LN..new_pt;
+    set &LN..new_pt;
+    Select;
+        when (i_rem)       do; TR = 0; TR_date = date_rem;   end;
+        when (i_res)       do; TR = 1; TR_date = date_res;   end;
+        when (i_ind_death) do; TR = 2; TR_date = date_death; end;
+        otherwise;
+    end;
+run;
 
 /*------ все проверки проведены, делаем вывод записей содержащих ошибки ------------*/
 
@@ -582,6 +590,8 @@ proc freq data=ift ;
    FORMAT oll_class oc_f.;
 run;
 
+
+
 *--------------------------------------------------------------------------;
 *-------------------     сравнительная статистика    ----------------------;
 *--------------------------------------------------------------------------;
@@ -595,6 +605,30 @@ proc means data=&LN..all_pt n median max min ;
 	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
 	title "Лабораторные показатели по всем группам";
 run;
+/*proc freq data=&LN..all_pt ;*/
+/*   tables  * new_oll_classname / nocum;*/
+/*   title 'Клинические показатели по всем группам';  */
+/**/
+/*run;*/
+
+/*new_neyrolekname	Нейролейкемия (Клинические проявления)*/
+/*new_splenomegname	Спленомегалия (Клинические проявления)*/
+/*new_gepatomegname	Гепатомегалия (Клинические проявления)*/
+/*new_uvsredostenname	Увеличение средостения (Клинические проявления)*/
+/*new_inf_donow_tername	Инфекции до начала терапии (Клинические проявления)*/
+/*new_gemorag_sindrname	Геморрагический синдром (Клинические проявления)*/
+/*new_peref_uluname	Периферические (увеличение лим. Узлов)*/
+/*new_vnutrigrud_uluname	Внутригрудные (увеличение лим. Узлов)*/
+/*new_abdomi_uluname	Абдоминальные (увеличение лим. Узлов)*/
+/*new_razmer_limfouzlov	Размер (увеличение лим. Узлов)*/
+/*new_ekstramodname	Экстрамодуллярные очаги*/
+/*new_skin_eoname	Кожа (Экстрамодуллярные очаги)*/
+/*new_gonad_eoname	Яичники (Экстрамодуллярные очаги)*/
+/*new_testis_eoname	Яичко (Экстрамодуллярные очаги)*/
+/*new_intratumor_eoname	Интратумор (Экстрамодуллярные очаги)*/
+/*new_other_eo	Другие Экстрамодуллярные очаги*/
+/**/
+
 
 proc sort data=&LN..new_pt;
 	by T_class12;
@@ -607,11 +641,13 @@ proc means data=&LN..new_pt n median max min ;
 	format T_class12 T_class12_f.;
 run;
 
-proc freq data=&LN..all_pt ;
-   tables new_gendercodename * new_oll_classname * age / nocum;
-   title 'Лабораторные показатели'; 
-   format age age_group_f.; 
+
+proc freq data=&LN..new_pt ;
+   tables TR*T_class12/ nocum;
+   title 'Результаты индукционной терапии';
+   format T_class12 T_class12_f. TR TR_f.
 run;
+
 
 
 
