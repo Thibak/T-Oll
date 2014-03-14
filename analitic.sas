@@ -103,6 +103,7 @@ proc format;
 	value T_class12_f 0 = "T1+T2" 1 = "T3" 2 = "T4";
 	value T_class124_f 0 = "T1+T2+T4" 1 = "T3";
 	value TR_f 0 = "Полная ремиссия" 1 = "Смерть в индукции" 2 = "Резистентная форма";
+	value BMinv_f 0 = "Без поражения" 1 = "С поражением";
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -491,8 +492,13 @@ Data &LN..new_pt;
 		when (8) do; T_class12 = 2 ; T_class124 = 0; end; *T4;
         otherwise;
     end;
-	label T_class12 = "Вариант ОЛЛ ";
-	label T_class124 ="Вариант ОЛЛ ";
+	
+	if new_blast_km > 5 then BMinv = 1; else BMinv = 0;
+
+	label T_class12  = "Вариант ОЛЛ ";
+	label T_class124 = "Вариант ОЛЛ ";
+	label BMinv = "Поражение костного мозга";
+
 run;
 
 *---------        Исход лечения         ---------;
@@ -597,9 +603,31 @@ proc freq data=&LN..new_pt ORDER = DATA;
    format TR TR_f.;
 run;
 
+proc freq data=&LN..new_pt ;
+   tables TR*T_class12/ nocum;
+   title 'Результаты индукционной терапии';
+   format T_class12 T_class12_f. TR TR_f.;
+run;
+
+proc freq data=&LN..new_pt ;
+   tables new_normkariotipname*T_class12/ nocum;
+   title 'Хромосомные аномалии';
+   format T_class12 T_class12_f.;
+run;
+
+proc freq data=&LN..new_pt ;
+   tables BMinv*T_class12/ nocum;
+   title 'Поражение к/м';
+   format T_class12 T_class12_f. BMinv BMinv_f.;
+run;
 *--------------------------------------------------------------------------;
 *-------------------     сравнительная статистика    ----------------------;
 *--------------------------------------------------------------------------;
+
+proc means data=&LN..all_pt n median max min ;
+	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
+	title "Общие лабораторные показатели";
+run;
 
 proc sort data=&LN..all_pt;
 	by new_oll_classname;
@@ -644,13 +672,6 @@ proc means data=&LN..new_pt n median max min ;
 	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
 	title "Лабораторные показатели по объединенным группам";
 	format T_class12 T_class12_f.;
-run;
-
-
-proc freq data=&LN..new_pt ;
-   tables TR*T_class12/ nocum;
-   title 'Результаты индукционной терапии';
-   format T_class12 T_class12_f. TR TR_f.;
 run;
 
 
