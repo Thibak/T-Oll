@@ -68,8 +68,8 @@ output;
    stop;
    keep tit1 tit2;
 run;
-title2 &ttl;
-title3 " зависимая:  &tt1 // фактор       :  &tt2";
+title1 &ttl;
+title2 " зависимая:  &tt1 // фактор       :  &tt2";
 ods graphics on;
 ods exclude WilHomCov LogHomCov HomStats  Quartiles ProductLimitEstimates; *;
 proc lifetest data=&dat plots =(s( &s &cl))  method=pl ;
@@ -491,8 +491,8 @@ Data &LN..new_pt;
 		when (8) do; T_class12 = 2 ; T_class124 = 0; end; *T4;
         otherwise;
     end;
-	label T_class12 = "Классификация ОЛЛ ";
-	label T_class124 ="Классификация ОЛЛ ";
+	label T_class12 = "Вариант ОЛЛ ";
+	label T_class124 ="Вариант ОЛЛ ";
 run;
 
 *---------        Исход лечения         ---------;
@@ -501,6 +501,7 @@ run;
 Data &LN..new_pt;
     set &LN..new_pt;
     Select;
+
         when (i_rem)       do; TR = 0; TR_date = date_rem;   end;
         when (i_res)       do; TR = 1; TR_date = date_res;   end;
         when (i_ind_death) do; TR = 2; TR_date = date_death; end;
@@ -584,13 +585,17 @@ proc freq data=&LN..all_pt ORDER = DATA;
 run;
 
 
-proc freq data=ift ;
-   tables oll_class / nocum;
-   title 'Иммунофенотип';
-   FORMAT oll_class oc_f.;
+/*proc freq data=ift ;*/
+/*   tables oll_class / nocum;*/
+/*   title 'Иммунофенотип';*/
+/*   FORMAT oll_class oc_f.;*/
+/*run;*/
+
+proc freq data=&LN..new_pt ORDER = DATA;
+   tables TR / nocum;
+   title 'Результаты терапии';
+   format TR TR_f.;
 run;
-
-
 
 *--------------------------------------------------------------------------;
 *-------------------     сравнительная статистика    ----------------------;
@@ -645,7 +650,7 @@ run;
 proc freq data=&LN..new_pt ;
    tables TR*T_class12/ nocum;
    title 'Результаты индукционной терапии';
-   format T_class12 T_class12_f. TR TR_f.
+   format T_class12 T_class12_f. TR TR_f.;
 run;
 
 
@@ -788,24 +793,10 @@ run;
 %eventan (&LN..new_pt, Trel, i_rel, 0,F,&y,,,"Общие показатели. Вероятность развития рецидива"); *вероятность развития рецидива;
 
 
-*%eventan (&LN..new_pt, TLive, i_death, 0,F,&y,,,"Общие показатели");
-*%eventan (&LN..new_pt, TRF, iRF, 0,F,&y,,,"Общие показатели");
 
-/*пол*/
-/*%eventan (&LN..new_pt, TLive, i_death, 0,,&y,new_gendercode,gender_f.,"пол");*/
-/*%eventan (&LN..new_pt, TRF, iRF, 0,,&y,new_gendercode,gender_f.,"пол");*/
-/*%eventan (&LN..new_pt, TLive, i_death, 0,F,&y,new_gendercode,gender_f.,"пол");*/
-/*%eventan (&LN..new_pt, TRF, iRF, 0,F,&y,new_gendercode,gender_f.,"пол");*/
-
-/*---------------- стратификация по фенотипам ----------------*/
-data  &LN..tmp;
-    set &LN..new_pt;
-    if (oll_class in (1,2)) then output;
-run;
-
-%eventan (&LN..tmp, TLive, i_death, 0,,&y,oll_class,oc_f.,"стратификация по нозологиям. Выживаемость");
-%eventan (&LN..tmp, TRF, iRF, 0,,&y,oll_class,oc_f.,"стратификация по нозологиям. Безрецидивная выживаемость");
-%eventan (&LN..tmp, Trel, i_rel, 0,F,&y,oll_class,oc_f.,"Стратификация по нозологиям. Вероятность развития рецидива"); *вероятность развития рецидива;
+%eventan (&LN..new_pt, TLive, i_death, 0,,&y,T_class12,T_class12_f.,"стратификация по вариантам Т-ОЛЛ. Выживаемость");
+%eventan (&LN..new_pt, TRF, iRF, 0,,&y,T_class12,T_class12_f.,"стратификация по вариантам Т-ОЛЛ. Безрецидивная выживаемость");
+%eventan (&LN..new_pt, Trel, i_rel, 0,F,&y,T_class12,T_class12_f.,"Стратификация по вариантам Т-ОЛЛ. Вероятность развития рецидива"); *вероятность развития рецидива;
 
 
 
