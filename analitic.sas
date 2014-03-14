@@ -100,6 +100,8 @@ proc format;
 	value y_n 0 = "нет" 1 = "да";
 	value au_al_f 1 = "ауто" 2 = "алло - родственная" ;
 	value reg_f 0 = "Регионы" 1 = "ГНЦ"; 
+	value T_class12_f 0 = "T1+T2" 1 = "T3" 2 = "T4";
+	value T_class124_f 0 = "T1+T2+T4" 1 = "T3";
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -432,8 +434,7 @@ Data &LN..new_pt;
     if date_rel > lastdate then lastdate = date_rel; 
 
 	if i_death = 1 and time_error = 0 then time_error = .;
-    /*ЗАПЛАТКА*/
-    *lastdate = MDY(9,1,2013);
+
 run;
 
 /*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
@@ -479,8 +480,20 @@ Data &LN..new_pt;
     end;
 run;
 
-/*Смерть в индукции*/
-/*отобрать индук*/
+*определяем новые группы;
+
+Data &LN..new_pt;
+    set &LN..new_pt;
+    select (new_oll_class);
+        when (5) do; T_class12 = 0 ; T_class124 = 0 ; end;  *T1;
+		when (6) do; T_class12 = 0 ; T_class124 = 0 ; end; *T2;
+		when (7) do; T_class12 = 3 ; T_class124 = 1; end; *T3;
+		when (8) do; T_class12 = 4 ; T_class124 = 0; end; *T4;
+        otherwise;
+    end;
+	label T_class12 = "Классификация ОЛЛ ";
+	label T_class124 ="Классификация ОЛЛ ";
+run;
 
 /*------ все проверки проведены, делаем вывод записей содержащих ошибки ------------*/
 
@@ -535,11 +548,18 @@ proc means data = &LN..all_pt median max min ;
    title 'Возраст больных (медиана, разброс)';
 run;
 
+proc freq data=&LN..all_pt ;
+   tables age / nocum;
+   title 'Возраст, группы';
+   format age age_group_f.;
+run;
 
 proc freq data=&LN..all_pt ;
    tables new_gendercodename / nocum;
-   title 'пол';
+   title 'Пол';
 run;
+
+
 
 proc sort data=&LN..all_pt;
 	by new_oll_class;
@@ -556,6 +576,38 @@ proc freq data=ift ;
    title 'Иммунофенотип';
    FORMAT oll_class oc_f.;
 run;
+
+*--------------------------------------------------------------------------;
+*-------------------     сравнительная статистика    ----------------------;
+*--------------------------------------------------------------------------;
+
+proc sort data=&LN..all_pt;
+	by new_oll_classname;
+run;
+
+proc means data=&LN..all_pt n median max min ;
+	by new_oll_classname;
+	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
+	title "Лабораторные показатели по всем группам";
+run;
+
+proc sort data=&LN..new_pt;
+	by T_class12;
+run;
+
+proc means data=&LN..new_pt n median max min ;
+	by T_class12;
+	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
+	title "Лабораторные показатели по объединенным группам";
+	format T_class12 T_class12_f.;
+run;
+
+proc freq data=&LN..all_pt ;
+   tables new_gendercodename * new_oll_classname * age / nocum;
+   title 'Лабораторные показатели'; 
+   format age age_group_f.; 
+run;
+
 
 
 /*==============================*/
