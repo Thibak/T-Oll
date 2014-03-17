@@ -370,11 +370,11 @@ data &LN..new_ev;
 run;
 
 
-/*  rel ремиссия = 1 */
+/*  rem ремиссия = 1 */
 /*  res резистентность = 2*/
 /*  death Смерть = 3*/
 /*  tkm ТКМ = 4*/
-/*  rem рецедив = 5*/
+/*  rel рецедив = 5*/
 
 
 /*--- генерируем индикаторы рецидива/ремиссии/смерти ---*/
@@ -469,7 +469,7 @@ Data &LN..new_pt;
         otherwise;
     end;
 
-	if (i_tkm) then Ttkm = (date_tkm - pr_b)/30;
+	if (i_tkm) then Ttkm = (date_tkm - date_rem)/30;
 run;
 
 /*Безрецедивная выживаемость*/
@@ -927,6 +927,11 @@ run;
 
 
 
-
+proc sort data = &LN..new_pt;
+by Ttkm;
+run;
+proc print data = &LN..new_pt;
+var pt_id name date_tkm  date_rem Ttkm;
+run;
 
 
