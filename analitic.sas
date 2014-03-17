@@ -104,6 +104,7 @@ proc format;
 	value T_class124_f 0 = "T1+T2+T4" 1 = "T3";
 	value TR_f 0 = "Полная ремиссия" 1 = "Смерть в индукции" 2 = "Резистентная форма";
 	value BMinv_f 0 = "Без поражения" 1 = "С поражением";
+	value AAC_f 0 = "Хемиотерапия" 1 = "Ауто ТКМ" 2 = "Алло ТКМ" 3 = "Ранний рецидив" 4 = "Смерть в ремиссии" 5 = "на индукции (T < 5 мес)";
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -397,7 +398,7 @@ data &LN..new_pt;
 	 if new_event_txt = "В индукции" then i_ind_death = 1; 
 	if new_event = 4 then do; i_tkm = 1; date_tkm = new_event_date; end;
 	 if new_event_txt = "ауто" then tkm_au_al = 1; 
-	 if new_event_txt = "алло - родственная" then tkm_au_al = 2;
+	 if new_event_txt in ("алло - родственная","алло - неродственная")  then tkm_au_al = 2;
     if new_event = 5 then do; i_rel = 1; date_rel = new_event_date; end;
 	if new_aspor_otmena = 1 then laspot = 1;
 /*---------------------------------*/
@@ -503,14 +504,38 @@ run;
 
 *---------        Исход лечения         ---------;
 
-
 Data &LN..new_pt;
     set &LN..new_pt;
     Select;
-
         when (i_rem)       do; TR = 0; TR_date = date_rem;   end;
         when (i_res)       do; TR = 1; TR_date = date_res;   end;
         when (i_ind_death) do; TR = 2; TR_date = date_death; end;
+        otherwise;
+    end;
+run;
+
+*---------        ауто/алло/хемо         ---------;
+
+*value AAC 0 = "Хемиотерапия" 1 = "Ауто ТКМ" 2 = "Алло ТКМ" 3 = "Ранний рецидив" 4 = "Смерть в ремиссии" 5 = "на индукции (T < 5 мес)";
+
+data &LN..new_pt;
+    set &LN..new_pt;
+	if TR = 0 then 
+    Select (tkm_au_al);
+        when (0) /*не проведена ни ауто ни алло ТКМ, требует анализа почему: Варианты: смерть в ПР, проведена ХТ, ранний рецидив (менее 5ти мес.);*/
+			do;  
+				if TLive < 5 then 
+					do;
+						select;
+							when (i_death) 	AAC = 4; *смерть в ПР;
+							when (i_rel) 	AAC = 3; *ранний рецидив;
+							otherwise AAC = 5;
+						end;
+					end;
+				else AAC = 0; *если прожил более 5ти мес., не умер, не срецедивировал и не трансплантировался, значит хемиотерапия;
+			end;        
+		when (1) do; AAC = 1; end;
+        when (2) do; AAC = 2; end;
         otherwise;
     end;
 run;
@@ -623,6 +648,18 @@ run;
 *--------------------------------------------------------------------------;
 *-------------------     сравнительная статистика    ----------------------;
 *--------------------------------------------------------------------------;
+
+data tmp;
+	set &LN..new_pt;
+	if TR = 0;
+run; 
+
+proc freq data=tmp;
+   tables AAC/ nocum;
+   title 'Ауто/Алло/Хемио';
+   format AAC AAC_f. ;
+run;
+
 
 proc means data=&LN..all_pt n median max min ;
 	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
