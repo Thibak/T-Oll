@@ -37,7 +37,7 @@
 %let LN = ALL2009; * имя библиотеки;
 Libname &LN "&disk.:\AC\OLL-2009\SAS"; * Библиотека данных;
 %let y = cl;
-%let cens = (99, 132, 258, 264);
+%let cens = (20, 99, 132, 258, 264);
 
 %macro Eventan(dat,T,C,i,s,cl,f,for, ttl);
 /*
@@ -468,6 +468,8 @@ Data &LN..new_pt;
         when (0) Trel = (lastdate - date_rem)/30;
         otherwise;
     end;
+
+	if (i_tkm) then Ttkm = (date_tkm - pr_b)/30;
 run;
 
 /*Безрецедивная выживаемость*/
@@ -540,6 +542,11 @@ data &LN..new_pt;
     end;
 run;
 
+data &LN..LM;
+	set &LN..new_pt;
+	if TR = 0;
+run; 
+
 /*------ все проверки проведены, делаем вывод записей содержащих ошибки ------------*/
 
 proc sort data = &LN..error_timeline;
@@ -610,6 +617,10 @@ proc sort data=&LN..all_pt;
 	by new_oll_class;
 run;
 
+proc means data = &LN..new_pt median max min ;
+   var Ttkm;
+   title 'Среднее кол. мес. до ТКМ (медиана, разброс)';
+run;
 proc freq data=&LN..all_pt ORDER = DATA;
    tables new_oll_classname / nocum;
    title 'Иммунофенотип (детально)';
@@ -647,19 +658,36 @@ proc freq data=&LN..new_pt ;
 run;
 *--------------------------------------------------------------------------;
 *-------------------     сравнительная статистика    ----------------------;
+*-------------------              Ландмарк           ----------------------;
 *--------------------------------------------------------------------------;
 
-data tmp;
-	set &LN..new_pt;
-	if TR = 0;
-run; 
 
-proc freq data=tmp;
+
+
+
+
+proc freq data=&LN..LM;
    tables AAC/ nocum;
-   title 'Ауто/Алло/Хемио';
+   title 'Ауто-ТКМ/Алло-ТКМ/ХТ';
    format AAC AAC_f. ;
 run;
 
+proc freq data=&LN..LM;
+   tables AAC*d_ch/ nocum;
+   title 'Ауто-ТКМ/Алло-ТКМ/ХТ Смена на дексаметазон';
+   format AAC AAC_f. ;
+run;
+
+proc sort data=&LN..LM;
+	by AAC;
+run;
+
+proc means data = &LN..LM median max min ;
+	by AAC;
+   var Ttkm;
+   title 'Среднее кол. мес. до ТКМ (медиана, разброс)';
+      format AAC AAC_f. ;
+run;
 
 proc means data=&LN..all_pt n median max min ;
 	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
@@ -711,6 +739,17 @@ proc means data=&LN..new_pt n median max min ;
 	format T_class12 T_class12_f.;
 run;
 
+
+proc sort data=&LN..LM;
+	by AAC;
+run;
+
+proc means data=&LN..LM n median max min ;
+	by AAC;
+	var age new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
+	title "(Ландмарк) Начальные лабораторные показатели по виду лечения";
+	format AAC AAC_f.;
+run;
 
 
 
