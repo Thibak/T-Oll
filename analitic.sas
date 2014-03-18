@@ -71,7 +71,7 @@ run;
 title1 &ttl;
 title2 " зависимая:  &tt1 // фактор       :  &tt2";
 ods graphics on;
-ods exclude WilHomCov LogHomCov HomStats  Quartiles ProductLimitEstimates; *;
+ods exclude WilHomCov LogHomCov HomStats  Quartiles ; *ProductLimitEstimates;
 proc lifetest data=&dat plots =(s( &s &cl))  method=pl ;
     %if &f ne %then %do; strata &f/test=logrank;
     id &f;format   &f &for;%end;
