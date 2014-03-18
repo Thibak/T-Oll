@@ -482,6 +482,7 @@ Data &LN..new_pt;
         when (iRF = 0) TRF = (lastdate - date_rem)/30;
         otherwise;
     end;
+
 run;
 
 *определяем новые группы;
@@ -545,6 +546,12 @@ run;
 data &LN..LM;
 	set &LN..new_pt;
 	if TR = 0;
+
+	select (AAC);
+		when (0) TLM = TRF - 6;
+		when (1,2) TLM = TRF - Ttkm;
+		otherwise;
+	end;
 run; 
 
 /*------ все проверки проведены, делаем вывод записей содержащих ошибки ------------*/
@@ -661,14 +668,20 @@ run;
 *-------------------              Ландмарк           ----------------------;
 *--------------------------------------------------------------------------;
 
-
-
-
-
-
 proc freq data=&LN..LM;
    tables AAC/ nocum;
-   title 'Ауто-ТКМ/Алло-ТКМ/ХТ';
+   title 'Ауто-ТКМ/Алло-ТКМ/ХТ (весь регистр)';
+   format AAC AAC_f. ;
+run;
+
+data tmp;
+	set &LN..LM;
+	if not(AAC=5);
+run; 
+
+proc freq data=tmp;
+   tables AAC/ nocum;
+   title 'Ауто-ТКМ/Алло-ТКМ/ХТ (результаты)';
    format AAC AAC_f. ;
 run;
 
@@ -677,6 +690,48 @@ proc freq data=&LN..LM;
    title 'Ауто-ТКМ/Алло-ТКМ/ХТ Смена на дексаметазон';
    format AAC AAC_f. ;
 run;
+
+data tmp;
+	set &LN..LM;
+	if AAC in (0,1);
+run; 
+
+proc freq data=tmp;
+   tables T_class12*AAC/ nocum;
+   title 'Ауто-ТКМ/ХТ X Вариант ОЛЛ';
+   format AAC AAC_f. T_class12 T_class12_f.;
+run;
+
+proc freq data=tmp;
+   tables BMinv*AAC/ nocum;
+   title 'Ауто-ТКМ/ХТ Х Поражение КМ';
+   format AAC AAC_f. BMinv BMinv_f.;
+run;
+
+proc freq data=tmp;
+   tables new_normkariotip*AAC/ nocum;
+   title 'Ауто-ТКМ/ХТ Х Хромосомные аномалии';
+   format AAC AAC_f. new_normkariotip y_n.;
+run;
+
+proc freq data=tmp;
+   tables new_neyrolek*AAC/ nocum;
+   title 'Ауто-ТКМ/ХТ Х Поражение ЦНС';
+   format AAC AAC_f. new_neyrolek y_n.;
+run;
+
+proc freq data=tmp;
+   tables  new_group_risk*AAC/ nocum;
+   title 'Ауто-ТКМ/ХТ Х Группа риска';
+   format AAC AAC_f. new_group_risk new_group_risk_f.;
+run;
+
+proc freq data=tmp;
+   tables  d_ch*AAC/ nocum;
+   title 'Ауто-ТКМ/ХТ Х смена на дексаметазон';
+   format AAC AAC_f. d_ch y_n.;
+run;
+ 
 
 proc sort data=&LN..LM;
 	by AAC;
@@ -690,7 +745,7 @@ proc means data = &LN..LM median max min ;
 run;
 
 proc means data=&LN..all_pt n median max min ;
-	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
+	var age new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
 	title "Общие лабораторные показатели";
 run;
 
@@ -700,7 +755,7 @@ run;
 
 proc means data=&LN..all_pt n median max min ;
 	by new_oll_classname;
-	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
+	var age new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
 	title "Лабораторные показатели по всем группам";
 run;
 /*proc freq data=&LN..all_pt ;*/
@@ -734,7 +789,7 @@ run;
 
 proc means data=&LN..new_pt n median max min ;
 	by T_class12;
-	var new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
+	var age new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
 	title "Лабораторные показатели по объединенным группам";
 	format T_class12 T_class12_f.;
 run;
@@ -751,7 +806,7 @@ proc means data=&LN..LM n median max min ;
 	format AAC AAC_f.;
 run;
 
-
+              
 
 /*==============================*/
 
@@ -895,6 +950,10 @@ run;
 %eventan (&LN..new_pt, TRF, iRF, 0,,&y,T_class12,T_class12_f.,"стратификация по вариантам Т-ОЛЛ. Безрецидивная выживаемость");
 %eventan (&LN..new_pt, Trel, i_rel, 0,F,&y,T_class12,T_class12_f.,"Стратификация по вариантам Т-ОЛЛ. Вероятность развития рецидива"); *вероятность развития рецидива;
 
+%eventan (&LN..new_pt, TLive, i_death, 0,,&y,new_gendercodename,,"стратификация по полу. Выживаемость");
+%eventan (&LN..new_pt, TRF, iRF, 0,,&y,new_gendercodename,,"стратификация по  полу. Безрецидивная выживаемость");
+%eventan (&LN..new_pt, Trel, i_rel, 0,F,&y,new_gendercodename,,"Стратификация по  полу. Вероятность развития рецидива"); *вероятность развития рецидива;
+
 
 
 /*---------------- стратификация по кариотипу -----------------*/
@@ -926,12 +985,6 @@ run;
 %eventan (tmp, Trel, i_rel, 0,F,&y,reg,reg_f.,"ГНЦ vs регионы. Вероятность развития рецидива"); *вероятность развития рецидива;
 
 
-
-proc sort data = &LN..new_pt;
-by Ttkm;
-run;
-proc print data = &LN..new_pt;
-var pt_id name date_tkm  date_rem Ttkm;
-run;
+%eventan (&LN..LM, TLM, iRF, 0,,&y,AAC,AAC_f.,"Ландмарк анализ. Безрецидивная выживаемость");
 
 
