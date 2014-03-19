@@ -37,7 +37,7 @@
 %let LN = ALL2009; * имя библиотеки;
 Libname &LN "&disk.:\AC\OLL-2009\SAS"; * Библиотека данных;
 %let y = cl;
-%let cens = (20, 99, 132, 258, 264);
+%let cens = (20, 27, 99, 132, 258, 264);
 
 %macro Eventan(dat,T,C,i,s,cl,f,for, ttl);
 /*
@@ -104,7 +104,8 @@ proc format;
 	value T_class124_f 0 = "T1+T2+T4" 1 = "T3";
 	value TR_f 0 = "Полная ремиссия" 1 = "Смерть в индукции" 2 = "Резистентная форма";
 	value BMinv_f 0 = "Без поражения" 1 = "С поражением";
-	value AAC_f 0 = "Хемиотерапия" 1 = "Ауто ТКМ" 2 = "Алло ТКМ" 3 = "Ранний рецидив" 4 = "Смерть в ремиссии" 5 = "на индукции (T < 5 мес)";
+	value AAC_f 0 = "Химиотерапия" 1 = "Ауто ТКМ" 2 = "Алло ТКМ" 3 = "Ранний рецидив" 4 = "Смерть в ремиссии" 5 = "на индукции (T < 5 мес)";
+	value FRint_f 0 = "ПР на другой фазе" 1 = "ПР на 1-ой фазе индукции" 2 = "ПР на 2-ой фазе индукции";
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -273,8 +274,18 @@ run;
 data &LN..new_pt /*(keep=)*/;
     set &LN..new_et;
     by pguid;
-    retain ec   d_ch faza time_error; *ec -- это количество этапов "свернутых";
-    if first.pguid then do;  ec = 0; d_ch = 0; faza = .; time_error = .; end;
+    retain ec d_ch faza time_error ind1bg ind1end ind2bg ind2end; *ec -- это количество этапов "свернутых";
+    if first.pguid then 
+		do;  
+			ec = 0; 
+			d_ch = 0; 
+			faza = .; 
+			time_error = .; 
+			ind1bg = .; 
+			ind1end = .; 
+			ind2bg = .; 
+			ind2end = .; 
+		end;
 /*--------------------------------------------------*/
     if it2 then ec + 1;
 	if lastdate = . then time_error = 0;
@@ -284,7 +295,10 @@ data &LN..new_pt /*(keep=)*/;
     if ph_e > lastdate and time_error = 0 then do; lastdate = ph_e; end;
 	if ph_e > lastdate then do; lastdate = ph_e; time_error = 1; end;
 	
-    if new_smena_na_deksamet = 1 then
+	if new_etap_protokol = 2 then do; ind1bg = ph_b; ind1end = ph_e; end;
+	if new_etap_protokol = 3 then do; ind2bg = ph_b; ind2end = ph_e; end;
+
+if new_smena_na_deksamet = 1 then
         do;
             d_ch = 1;
             faza = new_etap_protokol;
@@ -298,12 +312,21 @@ data &LN..new_pt /*(keep=)*/;
             d_ch = 0;
             faza = .;
 			time_error = .;
+			ind1bg = .; 
+			ind1end = .; 
+			ind2bg = .; 
+			ind2end = .; 
         end;
 	label d_ch = "Смена на дексаметазон";
 run;
 
-
-
+data &LN..new_pt;
+	set &LN..new_pt;
+			if (ind1bg  = .) then ind1bg  = pr_b + 7; 
+			if (ind1end = .) then ind1end = ind1bg + 36;
+			if (ind2bg  = .) then ind2bg  = ind1end;
+			if (ind2end = .) then ind2end = ind1bg + 70;
+run;
 
 
 /*РЕПОРТИНГ ОБ ОШИБКАХ РЕЛЯЦИЯХ ПАЦИЕНТ-ЭТАП*/
@@ -369,6 +392,9 @@ data &LN..new_ev;
     ie2 = i2;
 run;
 
+proc sort data=&LN..new_ev;
+    by pguid;
+run;
 
 /*  rem ремиссия = 1 */
 /*  res резистентность = 2*/
@@ -381,18 +407,32 @@ run;
 data &LN..new_pt;
     set &LN..new_ev;
     by pguid;
-    retain i_rem date_rem /**/ i_death date_death i_ind_death /**/i_tkm date_tkm tkm_au_al/**/ i_rel date_rel /**/ i_res date_res /**/ Laspot;
+    retain i_rem date_rem FRint /**/ i_death date_death i_ind_death /**/i_tkm date_tkm tkm_au_al/**/ i_rel date_rel /**/ i_res date_res /**/ Laspot;
     if first.pguid then 
 		do; 
-			i_rel = 0; date_rel = .;  
+			i_rem = 0; date_rem = .; FRint = .; 
 			i_res = 0; date_res = .; 
 			i_death = 0; date_death = .; i_ind_death = 0; 
 			i_tkm = 0; date_tkm = .; tkm_au_al = 0;
-			i_rem = 0; date_rem = .; 
+			i_rel = 0; date_rel = .;
 			Laspot = 0; 
 		end;
 /*----------------------------------*/
-    if new_event = 1 then do; i_rem = 1; date_rem = new_event_date; end;
+    if new_event = 1 then 
+		do; 
+			i_rem = 1; 
+			date_rem = new_event_date; 
+
+			*если нет даты начала терапии, предполагаем, что все идет по регламенту;
+
+
+			select;
+				when (ind1bg-2 <= date_rem <= ind1end) FRint = 1; *склеиваем этапы;
+				when (ind1bg-2 <= date_rem <= ind2bg +2 /*ind1end*/) FRint = 1; *склеиваем этапы;
+				when (ind2bg   <= date_rem <= ind2end+2) FRint = 2;  
+				otherwise FRint = 0;
+			end;
+		end;
 	if new_event = 2 then do; i_res = 1; date_res = new_event_date; end;
     if new_event = 3 then do; i_death = 1; date_death = new_event_date; end;
 	 if new_event_txt = "В индукции" then i_ind_death = 1; 
@@ -404,12 +444,12 @@ data &LN..new_pt;
 /*---------------------------------*/
     if last.pguid then 
 		do; 
-			if ie1 = 1 and ie2 = 1 then  output; 
-			i_rel = 0; date_rel = .; 
+			if ie1 ne 0 then  output; *<-----------------------;
+			i_rem = 0; date_rem = .; FRint = .;
 			i_res = 0; date_res = .; 
 			i_death = 0; date_death = .; i_ind_death = 0; 
 			i_tkm = 0; date_tkm = .; tkm_au_al = 0;
-			i_rem = 0; date_rem = .; 
+			i_rel = 0; date_rel = .;
 			Laspot = 0; 
 		end;
 run;
@@ -732,6 +772,11 @@ proc freq data=tmp;
    format AAC AAC_f. d_ch y_n.;
 run;
  
+proc freq data=tmp;
+   tables  FRint*AAC/ nocum;
+   title 'Ауто-ТКМ/ХТ Х ПР на какой фазе';
+   format AAC AAC_f. FRint FRint_f.;
+run;
 
 proc sort data=&LN..LM;
 	by AAC;
@@ -985,6 +1030,35 @@ run;
 %eventan (tmp, Trel, i_rel, 0,F,&y,reg,reg_f.,"ГНЦ vs регионы. Вероятность развития рецидива"); *вероятность развития рецидива;
 
 
-%eventan (&LN..LM, TLM, iRF, 0,,&y,AAC,AAC_f.,"Ландмарк анализ. Безрецидивная выживаемость");
+%eventan (&LN..LM, TLM, iRF, 0,,&y,AAC, AAC_f.,"Ландмарк анализ. Безрецидивная выживаемость");
+
+data tmp;
+	set &LN..new_pt;
+	if (i_rem);
+run;
+
+proc print data = tmp;
+	var pt_id name ind1bg ind1end ind2bg ind2end date_rem FRint;
+run;
+
+
+proc sort data = &LN..LM;
+	by AAC;
+run;
+
+proc print data = &LN..LM;
+title "";
+	var pt_id name AAC new_oll_classname;
+	format AAC AAC_f.;
+run;
+
+
+proc sort data = &LN..all_pt;
+	by pt_id;
+run;
+
+proc sort data = &LN..new_pt;
+	by pt_id;
+run;
 
 
