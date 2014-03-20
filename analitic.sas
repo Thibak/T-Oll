@@ -546,7 +546,11 @@ Data &LN..new_pt;
         otherwise;
     end;
 	
-	if new_blast_km > 5 then BMinv = 1; else BMinv = 0;
+	Select; 
+		when (new_blast_km => 5) BMinv = 1; 
+		when (new_blast_km  < 5) BMinv = 0;
+		otherwise;
+	end; 
 
 	label T_class12  = "Вариант ОЛЛ ";
 	label T_class124 = "Вариант ОЛЛ ";
@@ -597,8 +601,18 @@ data &LN..LM;
 	if TR = 0;
 
 	select (AAC);
-		when (0) TLM = TRF - 6;
-		when (1,2) TLM = TRF - Ttkm;
+		when (0) 
+			do;
+				TRF_LM = TRF - 6;
+				TLive_LM = TLive - 6;
+				Trel_LM = Trel - 6;
+			end;
+		when (1,2) 
+			do;
+				TRF_LM = TRF - Ttkm;
+				TLive_LM = TLive - Ttkm;
+				Trel_LM = Trel - Ttkm;
+			end;
 		otherwise;
 	end;
 run; 
@@ -740,6 +754,12 @@ proc freq data=&LN..LM;
    format AAC AAC_f. ;
 run;
 
+proc freq data=&LN..LM;
+   tables AAC*FRint/ nocum;
+   title 'Ауто-ТКМ/Алло-ТКМ/ХТ Х На какой фазе ремиссия';
+   format AAC AAC_f. FRint FRint_f.;
+run;
+ 
 data tmp;
 	set &LN..LM;
 	if AAC in (0,1);
@@ -1024,24 +1044,55 @@ run;
 
 
 /*регион москва 21C015D6-BF19-E211-B588-10000001B347 or Москва г*/
-data  tmp;
+data   &LN..new_pt;
     set &LN..new_pt;
 	reg = 0;
     if (ownerid = "51362F93-2C7B-E211-A54D-10000001B347") then reg=1; *Ахмерзаева Залина Хатаевна;
 run;
 
-proc freq data = tmp;
+proc freq data = &LN..new_pt;
 	table reg;
 run;
 
-%eventan (tmp, TLive, i_death, 0,,&y,reg,reg_f.,"ГНЦ vs регионы. Общая выживаемость");
-%eventan (tmp, TRF, iRF, 0,,&y,reg,reg_f.,"ГНЦ vs регионы. Безрецидивная выживаемость");
-%eventan (tmp, Trel, i_rel, 0,F,&y,reg,reg_f.,"ГНЦ vs регионы. Вероятность развития рецидива"); *вероятность развития рецидива;
+%eventan (&LN..new_pt, TLive, i_death, 0,,&y,reg,reg_f.,"ГНЦ vs регионы. Общая выживаемость");
+%eventan (&LN..new_pt, TRF, iRF, 0,,&y,reg,reg_f.,"ГНЦ vs регионы. Безрецидивная выживаемость");
+%eventan (&LN..new_pt, Trel, i_rel, 0,F,&y,reg,reg_f.,"ГНЦ vs регионы. Вероятность развития рецидива"); *вероятность развития рецидива;
+
+data tmp;
+	set &LN..new_pt;
+	if reg = 1;
+run;
+
+%eventan (tmp, TLive, i_death, 0,,&y,FRint, FRint_f.,"ГНЦ. Стратификация по ПР. Общая выживаемость");
+%eventan (tmp, TRF, iRF, 0,,&y,FRint, FRint_f.,"ГНЦ. Стратификация по ПР. Безрецидивная выживаемость");
+%eventan (tmp, Trel, i_rel, 0,F,&y,FRint, FRint_f.,"ГНЦ. Стратификация по ПР. Вероятность развития рецидива");
+
+data tmp;
+	set &LN..new_pt;
+	if reg = 0;
+run;
+
+%eventan (tmp, TLive, i_death, 0,,&y,FRint, FRint_f.,"Регионы. Стратификация по ПР. Общая выживаемость");
+%eventan (tmp, TRF, iRF, 0,,&y,FRint, FRint_f.,"Регионы. Стратификация по ПР. Безрецидивная выживаемость");
+%eventan (tmp, Trel, i_rel, 0,F,&y,FRint, FRint_f.,"Регионы. Стратификация по ПР. Вероятность развития рецидива");
 
 
-%eventan (&LN..LM, TLM, iRF, 0,,&y,AAC, AAC_f.,"Ландмарк анализ. Безрецидивная выживаемость");
+%eventan (&LN..LM, TLive_LM, i_death, 0,,&y,AAC, AAC_f.,"Ландмарк анализ. Общая выживаемость");
+%eventan (&LN..LM, TRF_LM, iRF, 0,,&y,AAC, AAC_f.,"Ландмарк анализ. Безрецидивная выживаемость");
+%eventan (&LN..LM, Trel_LM, i_rel, 0,F,&y,AAC, AAC_f.,"Ландмарк анализ. Вероятность развития рецидива"); 
 
-%eventan (&LN..LM, TLM, iRF, 0,,&y,FRint, FRint_f.,"Ландмарк анализ. Стратификация по ПР. Безрецидивная выживаемость");
+%eventan (&LN..LM, TLive_LM, i_death, 0,,&y,FRint, FRint_f.,"Ландмарк анализ. Стратификация по ПР. Общая выживаемость");
+%eventan (&LN..LM, TRF_LM, iRF, 0,,&y,FRint, FRint_f.,"Ландмарк анализ. Стратификация по ПР. Безрецидивная выживаемость");
+%eventan (&LN..LM, Trel_LM, i_rel, 0,F,&y,FRint, FRint_f.,"Ландмарк анализ. Стратификация по ПР. Вероятность развития рецидива");
+
+data tmp;
+	set &LN..new_pt;
+	if AAC = 0;
+run;
+
+%eventan (tmp, TLive, i_death, 0,,&y,T_class12,T_class12_f.,"Химиотерапия. Стратификация по вариантам Т-ОЛЛ. Общая выживаемость");
+%eventan (tmp, TRF, iRF, 0,,&y,T_class12,T_class12_f.,"Химиотерапия.  Стратификация по вариантам Т-ОЛЛ. Безрецидивная выживаемость");
+%eventan (tmp, Trel, i_rel, 0,F,&y,T_class12,T_class12_f.,"Химиотерапия.  Стратификация по вариантам Т-ОЛЛ. Вероятность развития рецидива");
 
 
 
