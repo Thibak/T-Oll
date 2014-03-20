@@ -1032,33 +1032,7 @@ run;
 
 %eventan (&LN..LM, TLM, iRF, 0,,&y,AAC, AAC_f.,"Ландмарк анализ. Безрецидивная выживаемость");
 
-data tmp;
-	set &LN..new_pt;
-	if (i_rem);
-run;
+%eventan (&LN..LM, TLM, iRF, 0,,&y,FRint, FRint_f.,"Ландмарк анализ. Стратификация по ПР. Безрецидивная выживаемость");
 
-proc print data = tmp;
-	var pt_id name ind1bg ind1end ind2bg ind2end date_rem FRint;
-run;
-
-
-proc sort data = &LN..LM;
-	by AAC;
-run;
-
-proc print data = &LN..LM;
-title "";
-	var pt_id name AAC new_oll_classname;
-	format AAC AAC_f.;
-run;
-
-
-proc sort data = &LN..all_pt;
-	by pt_id;
-run;
-
-proc sort data = &LN..new_pt;
-	by pt_id;
-run;
 
 
