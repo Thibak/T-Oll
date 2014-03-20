@@ -191,12 +191,18 @@ run;
 
 
 /*----- очередная заплатка возраста. По данным ЕН обнавляем возраста, там где нет данных заклеиваем данными из базы*/
+/*-- подцепляем правки из &LN..rps --*/
 proc sort data=&LN..tmp_age;
 	by pt_id;
 run;
 
+
+proc sort data=&LN..rps;
+	by pt_id;
+run;
+
 data &LN..all_pt; 
-	merge &LN..all_pt &LN..tmp_age;
+	merge &LN..all_pt &LN..tmp_age &LN..rps;
 	by pt_id;
 run;
 
@@ -221,6 +227,9 @@ if age = . then age = floor(yrdif(new_birthdate, pr_b,'AGE'));  *если возраста н
         when (new_oll_class = 9 )  oll_class = 3; /*бифенотипически*/
         otherwise;
     end;
+
+/*подправляем данные*/
+
 
 /* ручное цензурирование данных*/
     if NOT (pt_id in &cens ) then output;
