@@ -437,7 +437,7 @@ data &LN..new_pt;
 
 
 			select;
-				when (ind1bg-2 <= date_rem <= ind1end) FRint = 1; *склеиваем этапы;
+				when (ind1bg-10 <= date_rem <= ind1end) FRint = 1; *склеиваем этапы;
 				when (ind1bg-2 <= date_rem <= ind2bg +2 /*ind1end*/) FRint = 1; *склеиваем этапы;
 				when (ind2bg   <= date_rem <= ind2end+2) FRint = 2;  
 				otherwise FRint = 0;
@@ -1115,6 +1115,15 @@ data tmp;
 	if AAC = 0;
 run;
 
+data tmp2;
+	set &LN..LM;
+	if AAC = 0;
+run;
+%eventan (tmp2, TLive_LM, i_death, 0,,&y,FRint, FRint_f.,"Химиотерапия. Ландмарк анализ. Стратификация по ПР. Общая выживаемость");
+%eventan (tmp2, TRF_LM, iRF, 0,,&y,FRint, FRint_f.,"Химиотерапия. Ландмарк анализ. Стратификация по ПР. Безрецидивная выживаемость");
+%eventan (tmp2, Trel_LM, i_rel, 0,F,&y,FRint, FRint_f.,"Химиотерапия. Ландмарк анализ. Стратификация по ПР. Вероятность развития рецидива");
+
+
 %eventan (tmp, TLive, i_death, 0,,&y,T_class12,T_class12_f.,"Химиотерапия. Стратификация по вариантам Т-ОЛЛ. Общая выживаемость");
 %eventan (tmp, TRF, iRF, 0,,&y,T_class12,T_class12_f.,"Химиотерапия.  Стратификация по вариантам Т-ОЛЛ. Безрецидивная выживаемость");
 %eventan (tmp, Trel, i_rel, 0,F,&y,T_class12,T_class12_f.,"Химиотерапия.  Стратификация по вариантам Т-ОЛЛ. Вероятность развития рецидива");
@@ -1128,16 +1137,24 @@ run;
 run; */
 
 proc phreg data=&LN..LM; 
-	model TLive_LM*i_death(0)= AAC BMT reg; 
+	model TLive_LM*i_death(0)=BMT reg; 
 	title "Ландмарк.  Общая выживаемость";
 run; 
 
 proc phreg data=&LN..LM; 
-	model TRF_LM*iRF(0)= AAC BMT reg; 
+	model TRF_LM*iRF(0)= BMT reg; 
 	title "Ландмарк. Безрецидивная выживаемость";
 run; 
 
 proc phreg data=&LN..LM; 
-	model Trel_LM*i_rel(0)= AAC BMT reg; 
+	model Trel_LM*i_rel(0)= BMT reg; 
 	title "Ландмарк. Вероятность развития рецидива";
 run; 
+
+proc sort  data = &LN..LM;
+	by FRint;
+run;
+proc print data = &LN..LM;
+	var pt_id name FRint;
+	format FRint FRint_f.;
+run;
