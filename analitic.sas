@@ -106,6 +106,7 @@ proc format;
 	value BMinv_f 0 = "Без поражения" 1 = "С поражением";
 	value AAC_f 0 = "Химиотерапия" 1 = "Ауто ТКМ" 2 = "Алло ТКМ" 3 = "Ранний рецидив" 4 = "Смерть в ремиссии" 5 = "на индукции (T < 5 мес)";
 	value FRint_f 0 = "ПР на другой фазе" 1 = "ПР на 1-ой фазе индукции" 2 = "ПР на 2-ой фазе индукции";
+	value BMT_f 0 = "Химиотерапия" 1 = "ТКМ"
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -594,6 +595,21 @@ data &LN..new_pt;
         when (2) do; AAC = 2; end;
         otherwise;
     end;
+	label AAC = "Вид лечения";
+run;
+
+data   &LN..new_pt;
+    set &LN..new_pt;
+	reg = 0;
+    if (ownerid = "51362F93-2C7B-E211-A54D-10000001B347") then reg=1; *Ахмерзаева Залина Хатаевна;
+	select (AAC);
+		when (1,2) BMT = 1;
+		when (0) BMT = 0;
+		otherwise;
+	end;
+	label	BMT = "ТКМ vs Химеотерапия"
+			reg = "Где проводилось лечение";
+	
 run;
 
 data &LN..LM;
@@ -1063,6 +1079,11 @@ data tmp;
 	if reg = 1;
 run;
 
+%eventan (tmp, TLive, i_death, 0,,&y,AAC, AAC_f.,"ГНЦ. Общая выживаемость");
+%eventan (tmp, TRF, iRF, 0,,&y,AAC, AAC_f.,"ГНЦ. Безрецидивная выживаемость");
+%eventan (tmp, Trel, i_rel, 0,F,&y,AAC, AAC_f.,"ГНЦ. Вероятность развития рецидива"); 
+
+
 %eventan (tmp, TLive, i_death, 0,,&y,FRint, FRint_f.,"ГНЦ. Стратификация по ПР. Общая выживаемость");
 %eventan (tmp, TRF, iRF, 0,,&y,FRint, FRint_f.,"ГНЦ. Стратификация по ПР. Безрецидивная выживаемость");
 %eventan (tmp, Trel, i_rel, 0,F,&y,FRint, FRint_f.,"ГНЦ. Стратификация по ПР. Вероятность развития рецидива");
@@ -1071,6 +1092,10 @@ data tmp;
 	set &LN..new_pt;
 	if reg = 0;
 run;
+
+%eventan (tmp, TLive, i_death, 0,,&y,AAC, AAC_f.,"Регионы. Общая выживаемость");
+%eventan (tmp, TRF, iRF, 0,,&y,AAC, AAC_f.,"Регионы. Безрецидивная выживаемость");
+%eventan (tmp, Trel, i_rel, 0,F,&y,AAC, AAC_f.,"Регионы. Вероятность развития рецидива"); 
 
 %eventan (tmp, TLive, i_death, 0,,&y,FRint, FRint_f.,"Регионы. Стратификация по ПР. Общая выживаемость");
 %eventan (tmp, TRF, iRF, 0,,&y,FRint, FRint_f.,"Регионы. Стратификация по ПР. Безрецидивная выживаемость");
@@ -1094,5 +1119,25 @@ run;
 %eventan (tmp, TRF, iRF, 0,,&y,T_class12,T_class12_f.,"Химиотерапия.  Стратификация по вариантам Т-ОЛЛ. Безрецидивная выживаемость");
 %eventan (tmp, Trel, i_rel, 0,F,&y,T_class12,T_class12_f.,"Химиотерапия.  Стратификация по вариантам Т-ОЛЛ. Вероятность развития рецидива");
 
+%eventan (tmp, TLive, i_death, 0,,&y,reg, reg_f.,"Химиотерапия. Общая выживаемость");
+%eventan (tmp, TRF, iRF, 0,,&y,reg, reg_f.,"Химиотерапия.   Безрецидивная выживаемость");
+%eventan (tmp, Trel, i_rel, 0,F,&y,reg, reg_f.,"Химиотерапия.   Вероятность развития рецидива");
 
+/*proc phreg data=a; 
+	model ВРЕМЯ*ИНДИКАТОР_ЦЕНЗУРИРОВАНИЯ(0)= ФАКТОР1 ФАКТОР2; 
+run; */
 
+proc phreg data=&LN..LM; 
+	model TLive_LM*i_death(0)= AAC BMT reg; 
+	title "Ландмарк.  Общая выживаемость";
+run; 
+
+proc phreg data=&LN..LM; 
+	model TRF_LM*iRF(0)= AAC BMT reg; 
+	title "Ландмарк. Безрецидивная выживаемость";
+run; 
+
+proc phreg data=&LN..LM; 
+	model Trel_LM*i_rel(0)= AAC BMT reg; 
+	title "Ландмарк. Вероятность развития рецидива";
+run; 
