@@ -37,7 +37,8 @@
 %let LN = ALL2009; * имя библиотеки;
 Libname &LN "&disk.:\AC\OLL-2009\SAS"; * Библиотека данных;
 %let y = cl;
-%let cens = (20, 27, 99, 132, 258, 264);
+%let cens = (0, 1000);
+*20, 27, 99, 132, 258, 264;
 
 %macro Eventan(dat,T,C,i,s,cl,f,for, ttl);
 /*
@@ -107,6 +108,7 @@ proc format;
 	value AAC_f 0 = "Химиотерапия" 1 = "Ауто ТКМ" 2 = "Алло ТКМ" 3 = "Ранний рецидив" 4 = "Смерть в ремиссии" 5 = "на индукции (T < 5 мес)";
 	value FRint_f 0 = "ПР на другой фазе" 1 = "ПР на 1-ой фазе индукции" 2 = "ПР на 2-ой фазе индукции";
 	value BMT_f 0 = "Химиотерапия" 1 = "ТКМ";
+	value tkm_au_al_f 0 = "Химиотерапия" 1="Ауто-ТКМ" 2="Алло-ТКМ";
 run;
 
 /*------------ препроцессинг восстановления реляций и целостности данных ---------------*/
@@ -548,9 +550,9 @@ Data &LN..new_pt;
     end;
 	
 	Select; 
-		when (new_blast_km => 5) BMinv = 1; 
-		when (new_blast_km = .) BMinv = .;
-		when (new_blast_km  < 5) BMinv = 0;
+		when (blast_km => 5) BMinv = 1; 
+		when (blast_km = .) BMinv = .;
+		when (blast_km  < 5) BMinv = 0;
 
 		otherwise;
 	end; 
@@ -579,34 +581,23 @@ run;
 
 *value AAC 0 = "Химиотерапия" 1 = "Ауто ТКМ" 2 = "Алло ТКМ" 3 = "Ранний рецидив" 4 = "Смерть в ремиссии" 5 = "на индукции (T < 5 мес)";
 
-data &LN..new_pt;
-    set &LN..new_pt;
-	if TR = 0 then 
-    Select (tkm_au_al);
-        when (0) /*не проведена ни ауто ни алло ТКМ, требует анализа почему: Варианты: смерть в ПР, проведена ХТ, ранний рецидив (менее 5ти мес.);*/
-			do;  
-				select;
-					when (TLive < 6) 
-						do;
-							if (i_death) then AAC = 4; *смерть в ПР;
-								else AAC = 5;
-						end;
-					when (Trel < 6 and i_rel) AAC = 3; *ранний рецидив;
-					otherwise AAC = 0; *если прожил более 5ти мес., не умер, не срецедивировал и не трансплантировался, значит химиотерапия;
-				end;
-			end;        
-		when (1) do; AAC = 1; end;
-        when (2) do; AAC = 2; end;
-        otherwise;
-    end;
-	label AAC = "Вид лечения";
-run;
+/*data &LN..NLM;*/
+/*    set &LN..new_pt;*/
+/*		/*отчего ТРФ маленькое, парсим*/  */
+/*	if (TRF < 6) then */
+/*					do;*/
+/*						if (i_death) then PS = 0; *смерть в ПР;*/
+/*							else PS = 1; *;*/
+/*					end;*/
+/*				when (Trel < 6 and i_rel) AAC = 3; *ранний рецидив;*/
+/*				*если прожил более 5ти мес., не умер, не срецедивировал и не трансплантировался, значит химиотерапия;*/
+/*run;*/
 
 data   &LN..new_pt;
     set &LN..new_pt;
 	reg = 0;
     if (ownerid = "51362F93-2C7B-E211-A54D-10000001B347") then reg=1; *Ахмерзаева Залина Хатаевна;
-	select (AAC);
+	select (tkm_au_al);
 		when (1,2) BMT = 1;
 		when (0) BMT = 0;
 		otherwise;
@@ -618,9 +609,9 @@ run;
 
 data &LN..LM;
 	set &LN..new_pt;
-	if TR = 0;
+	if TRF > 6;
 
-	select (AAC);
+	select (tkm_au_al);
 		when (0) 
 			do;
 				TRF_LM = TRF - 6;
@@ -752,96 +743,86 @@ run;
 *--------------------------------------------------------------------------;
 
 proc freq data=&LN..LM;
-   tables AAC/ nocum;
-   title 'Ауто-ТКМ/Алло-ТКМ/ХТ (весь регистр)';
-   format AAC AAC_f. ;
+   tables tkm_au_al/ nocum;
+   title 'Ауто-ТКМ/Алло-ТКМ/ХТ (ландмарк)';
+   format tkm_au_al tkm_au_al_f. ;
 run;
 
-data tmp;
-	set &LN..LM;
-	if not(AAC=5);
-run; 
 
-proc freq data=tmp;
-   tables AAC/ nocum;
-   title 'Ауто-ТКМ/Алло-ТКМ/ХТ (результаты)';
-   format AAC AAC_f. ;
+proc freq data=&LN..LM;
+   tables tkm_au_al*d_ch/ nocum;
+   title 'Ауто-ТКМ/Алло-ТКМ/ХТ X Смена на дексаметазон (ландмарк)';
+   format tkm_au_al tkm_au_al_f. ;
 run;
 
 proc freq data=&LN..LM;
-   tables AAC*d_ch/ nocum;
-   title 'Ауто-ТКМ/Алло-ТКМ/ХТ Смена на дексаметазон';
-   format AAC AAC_f. ;
-run;
-
-proc freq data=&LN..LM;
-   tables AAC*FRint/ nocum;
-   title 'Ауто-ТКМ/Алло-ТКМ/ХТ Х На какой фазе ремиссия';
-   format AAC AAC_f. FRint FRint_f.;
+   tables tkm_au_al*FRint/ nocum;
+   title 'Ауто-ТКМ/Алло-ТКМ/ХТ Х На какой фазе ремиссия (Ландмарк)';
+   format tkm_au_al tkm_au_al_f. FRint FRint_f.;
 run;
  
 data tmp;
 	set &LN..LM;
-	if AAC in (0,1);
+	if tkm_au_al in (0,1);
 run; 
 
 proc freq data=tmp;
-   tables T_class12*AAC/ nocum;
-   title 'Ауто-ТКМ/ХТ X Вариант ОЛЛ';
-   format AAC AAC_f. T_class12 T_class12_f.;
+   tables T_class12*tkm_au_al/ nocum;
+   title 'Ауто-ТКМ/ХТ X Вариант ОЛЛ (ландмарк)';
+   format tkm_au_al tkm_au_al_f. T_class12 T_class12_f.;
 run;
 
 proc freq data=tmp;
-   tables BMinv*AAC/ nocum;
-   title 'Ауто-ТКМ/ХТ Х Поражение КМ';
-   format AAC AAC_f. BMinv BMinv_f.;
+   tables BMinv*tkm_au_al/ nocum;
+   title 'Ауто-ТКМ/ХТ Х Поражение КМ (ландмарк)';
+   format tkm_au_al tkm_au_al_f. BMinv BMinv_f.;
 run;
 
 proc freq data=&LN..LM;
-   tables BMinv*AAC/ nocum;
-   title 'вид лечения Х Поражение КМ';
-   format AAC AAC_f. BMinv BMinv_f.;
+   tables BMinv*tkm_au_al/ nocum;
+   title 'вид лечения Х Поражение КМ (Ландмарк)';
+   format tkm_au_al tkm_au_al_f. BMinv BMinv_f.;
 run;
 
 proc freq data=tmp;
-   tables new_normkariotip*AAC/ nocum;
-   title 'Ауто-ТКМ/ХТ Х Хромосомные аномалии';
-   format AAC AAC_f. new_normkariotip y_n.;
+   tables new_normkariotip*tkm_au_al/ nocum;
+   title 'Ауто-ТКМ/ХТ Х Хромосомные аномалии (Ландмарк)';
+   format tkm_au_al tkm_au_al_f. new_normkariotip y_n.;
 run;
 
 proc freq data=tmp;
-   tables new_neyrolek*AAC/ nocum;
-   title 'Ауто-ТКМ/ХТ Х Поражение ЦНС';
-   format AAC AAC_f. new_neyrolek y_n.;
+   tables new_neyrolek*tkm_au_al/ nocum;
+   title 'Ауто-ТКМ/ХТ Х Поражение ЦНС (Ландмарк)';
+   format tkm_au_al tkm_au_al_f. new_neyrolek y_n.;
 run;
 
 proc freq data=tmp;
-   tables  new_group_risk*AAC/ nocum;
-   title 'Ауто-ТКМ/ХТ Х Группа риска';
-   format AAC AAC_f. new_group_risk new_group_risk_f.;
+   tables  new_group_risk*tkm_au_al/ nocum;
+   title 'Ауто-ТКМ/ХТ Х Группа риска (ландмарк)';
+   format tkm_au_al tkm_au_al_f. new_group_risk new_group_risk_f.;
 run;
 
 proc freq data=tmp;
-   tables  d_ch*AAC/ nocum;
-   title 'Ауто-ТКМ/ХТ Х смена на дексаметазон';
-   format AAC AAC_f. d_ch y_n.;
+   tables  d_ch*tkm_au_al/ nocum;
+   title 'Ауто-ТКМ/ХТ Х смена на дексаметазон (Ландмарк)';
+   format tkm_au_al tkm_au_al_f. d_ch y_n.;
 run;
  
 proc freq data=tmp;
-   tables  FRint*AAC/ nocum;
-   title 'Ауто-ТКМ/ХТ Х ПР на какой фазе';
-   format AAC AAC_f. FRint FRint_f.;
+   tables  FRint*tkm_au_al/ nocum;
+   title 'Ауто-ТКМ/ХТ Х ПР на какой фазе (Ландмарк)';
+   format tkm_au_al tkm_au_al_f. FRint FRint_f.;
 run;
 
 proc sort data=&LN..LM;
-	by AAC;
+	by tkm_au_al;
 run;
 
 proc means data = &LN..LM median max min ;
-	by AAC;
+	by tkm_au_al;
    var Ttkm;
    title 'Среднее кол. мес. до ТКМ (медиана, разброс)';
-      format AAC AAC_f. ;
+      format tkm_au_al tkm_au_al_f. ;
 run;
 
 proc means data=&LN..all_pt n median max min ;
@@ -896,14 +877,14 @@ run;
 
 
 proc sort data=&LN..LM;
-	by AAC;
+	by tkm_au_al;
 run;
 
 proc means data=&LN..LM n median max min ;
-	by AAC;
+	by tkm_au_al;
 	var age new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
 	title "(Ландмарк) Начальные лабораторные показатели по виду лечения";
-	format AAC AAC_f.;
+	format tkm_au_al tkm_au_al_f.;
 run;
 
               
@@ -1104,13 +1085,13 @@ data tmp2;
 	if reg = 1;
 run;
 
-%eventan (tmp, TLive, i_death, 0,,&y,AAC, AAC_f.,"ГНЦ. Общая выживаемость");
-%eventan (tmp, TRF, iRF, 0,,&y,AAC, AAC_f.,"ГНЦ. Безрецидивная выживаемость");
-%eventan (tmp, Trel, i_rel, 0,F,&y,AAC, AAC_f.,"ГНЦ. Вероятность развития рецидива"); 
+%eventan (tmp, TLive, i_death, 0,,&y,tkm_au_al, tkm_au_al_f.,"ГНЦ. Общая выживаемость");
+%eventan (tmp, TRF, iRF, 0,,&y,tkm_au_al, tkm_au_al_f.,"ГНЦ. Безрецидивная выживаемость");
+%eventan (tmp, Trel, i_rel, 0,F,&y,tkm_au_al, tkm_au_al_f.,"ГНЦ. Вероятность развития рецидива"); 
 
-%eventan (tmp2, TLive_LM, i_death, 0,,&y,AAC, AAC_f.,"Ландмарк. ГНЦ. Стратификация по виду лечения. Общая выживаемость");
-%eventan (tmp2, TRF_LM, iRF, 0,,&y,AAC, AAC_f.,"Ландмарк. ГНЦ. Стратификация по виду лечения. Безрецидивная выживаемость");
-%eventan (tmp2, Trel_LM, i_rel, 0,F,&y,AAC, AAC_f.,"Ландмарк. ГНЦ. Стратификация по виду лечения. Вероятность развития рецидива");
+%eventan (tmp2, TLive_LM, i_death, 0,,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк. ГНЦ. Стратификация по виду лечения. Общая выживаемость");
+%eventan (tmp2, TRF_LM, iRF, 0,,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк. ГНЦ. Стратификация по виду лечения. Безрецидивная выживаемость");
+%eventan (tmp2, Trel_LM, i_rel, 0,F,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк. ГНЦ. Стратификация по виду лечения. Вероятность развития рецидива");
 
 %eventan (tmp2, TLive_LM, i_death, 0,,&y,BMT, BMT_f.,"Ландмарк. ГНЦ. Стратификация по виду лечения. Общая выживаемость");
 %eventan (tmp2, TRF_LM, iRF, 0,,&y,BMT, BMT_f.,"Ландмарк. ГНЦ. Стратификация по виду лечения. Безрецидивная выживаемость");
@@ -1135,13 +1116,13 @@ data tmp2;
 	if reg = 0;
 run;
 
-%eventan (tmp, TLive, i_death, 0,,&y,AAC, AAC_f.,"Регионы. Общая выживаемость");
-%eventan (tmp, TRF, iRF, 0,,&y,AAC, AAC_f.,"Регионы. Безрецидивная выживаемость");
-%eventan (tmp, Trel, i_rel, 0,F,&y,AAC, AAC_f.,"Регионы. Вероятность развития рецидива"); 
+%eventan (tmp, TLive, i_death, 0,,&y,tkm_au_al, tkm_au_al_f.,"Регионы. Общая выживаемость");
+%eventan (tmp, TRF, iRF, 0,,&y,tkm_au_al, tkm_au_al_f.,"Регионы. Безрецидивная выживаемость");
+%eventan (tmp, Trel, i_rel, 0,F,&y,tkm_au_al, tkm_au_al_f.,"Регионы. Вероятность развития рецидива"); 
 
-%eventan (tmp2, TLive_LM, i_death, 0,,&y,AAC, AAC_f.,"Ландмарк. Регионы. Стратификация по виду лечения. Общая выживаемость");
-%eventan (tmp2, TRF_LM, iRF, 0,,&y,AAC, AAC_f.,"Ландмарк. Регионы. Стратификация по виду лечения. Безрецидивная выживаемость");
-%eventan (tmp2, Trel_LM, i_rel, 0,F,&y,AAC, AAC_f.,"Ландмарк. Регионы. Стратификация по виду лечения. Вероятность развития рецидива");
+%eventan (tmp2, TLive_LM, i_death, 0,,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк. Регионы. Стратификация по виду лечения. Общая выживаемость");
+%eventan (tmp2, TRF_LM, iRF, 0,,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк. Регионы. Стратификация по виду лечения. Безрецидивная выживаемость");
+%eventan (tmp2, Trel_LM, i_rel, 0,F,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк. Регионы. Стратификация по виду лечения. Вероятность развития рецидива");
 
 %eventan (tmp2, TLive_LM, i_death, 0,,&y,BMT, BMT_f.,"Ландмарк. Регионы. Стратификация по виду лечения. Общая выживаемость");
 %eventan (tmp2, TRF_LM, iRF, 0,,&y,BMT, BMT_f.,"Ландмарк. Регионы. Стратификация по виду лечения. Безрецидивная выживаемость");
