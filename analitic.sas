@@ -549,9 +549,13 @@ Data &LN..new_pt;
 	
 	Select; 
 		when (new_blast_km => 5) BMinv = 1; 
+		when (new_blast_km = .) BMinv = .;
 		when (new_blast_km  < 5) BMinv = 0;
+
 		otherwise;
 	end; 
+
+	*if (new_blast_km = .) then BMinv = .;
 
 	label T_class12  = "Вариант ОЛЛ ";
 	label T_class124 = "Вариант ОЛЛ ";
@@ -573,7 +577,7 @@ run;
 
 *---------        ауто/алло/хемо         ---------;
 
-*value AAC 0 = "Хемиотерапия" 1 = "Ауто ТКМ" 2 = "Алло ТКМ" 3 = "Ранний рецидив" 4 = "Смерть в ремиссии" 5 = "на индукции (T < 5 мес)";
+*value AAC 0 = "Химиотерапия" 1 = "Ауто ТКМ" 2 = "Алло ТКМ" 3 = "Ранний рецидив" 4 = "Смерть в ремиссии" 5 = "на индукции (T < 5 мес)";
 
 data &LN..new_pt;
     set &LN..new_pt;
@@ -581,15 +585,15 @@ data &LN..new_pt;
     Select (tkm_au_al);
         when (0) /*не проведена ни ауто ни алло ТКМ, требует анализа почему: Варианты: смерть в ПР, проведена ХТ, ранний рецидив (менее 5ти мес.);*/
 			do;  
-				if TLive < 5 then 
-					do;
-						select;
-							when (i_death) 	AAC = 4; *смерть в ПР;
-							when (i_rel) 	AAC = 3; *ранний рецидив;
-							otherwise AAC = 5;
+				select;
+					when (TLive < 6) 
+						do;
+							if (i_death) then AAC = 4; *смерть в ПР;
+								else AAC = 5;
 						end;
-					end;
-				else AAC = 0; *если прожил более 5ти мес., не умер, не срецедивировал и не трансплантировался, значит хемиотерапия;
+					when (Trel < 6 and i_rel) AAC = 3; *ранний рецидив;
+					otherwise AAC = 0; *если прожил более 5ти мес., не умер, не срецедивировал и не трансплантировался, значит химиотерапия;
+				end;
 			end;        
 		when (1) do; AAC = 1; end;
         when (2) do; AAC = 2; end;
@@ -790,6 +794,12 @@ run;
 proc freq data=tmp;
    tables BMinv*AAC/ nocum;
    title 'Ауто-ТКМ/ХТ Х Поражение КМ';
+   format AAC AAC_f. BMinv BMinv_f.;
+run;
+
+proc freq data=&LN..LM;
+   tables BMinv*AAC/ nocum;
+   title 'вид лечения Х Поражение КМ';
    format AAC AAC_f. BMinv BMinv_f.;
 run;
 
