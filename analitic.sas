@@ -37,7 +37,7 @@
 %let LN = ALL2009; * имя библиотеки;
 Libname &LN "&disk.:\AC\OLL-2009\SAS"; * Библиотека данных;
 %let y = cl;
-%let cens = (0, 1000);
+%let cens = ();
 *20, 27, 99, 132, 258, 264;
 
 %macro Eventan(dat,T,C,i,s,cl,f,for, ttl);
@@ -821,7 +821,7 @@ run;
 proc means data = &LN..LM median max min ;
 	by tkm_au_al;
    var Ttkm;
-   title 'Среднее кол. мес. до ТКМ (медиана, разброс)';
+   title 'Среднее кол. мес. до ТКМ (медиана, разброс) (ландмарк)';
       format tkm_au_al tkm_au_al_f. ;
 run;
 
@@ -1063,7 +1063,7 @@ run;
 
 proc freq data = &LN..LM;
 	table reg*BMT/ nocum;
-	title "методы лечения по регионам";
+	title "методы лечения по регионам (ландмарк)";
 	format reg reg_f. BMT BMT_f.;
 run;
 
