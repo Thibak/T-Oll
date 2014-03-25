@@ -37,7 +37,7 @@
 %let LN = ALL2009; * имя библиотеки;
 Libname &LN "&disk.:\AC\OLL-2009\SAS"; * Библиотека данных;
 %let y = cl;
-%let cens = ();
+%let cens = (0);
 *20, 27, 99, 132, 258, 264;
 
 %macro Eventan(dat,T,C,i,s,cl,f,for, ttl);
@@ -439,9 +439,9 @@ data &LN..new_pt;
 
 
 			select;
-				when (ind1bg-10 <= date_rem <= ind1end) FRint = 1; *склеиваем этапы;
-				when (ind1bg-2 <= date_rem <= ind2bg +2 /*ind1end*/) FRint = 1; *склеиваем этапы;
-				when (ind2bg   <= date_rem <= ind2end+2) FRint = 2;  
+				when (ind1bg-10 <= date_rem <= ind1end+15) FRint = 1; *склеиваем этапы;
+				*when (ind1bg-2 <= date_rem <= ind2bg +2 /*ind1end*/) FRint = 1; *склеиваем этапы;
+				when (ind2bg+15   <= date_rem <= ind2end+2) FRint = 2;  
 				otherwise FRint = 0;
 			end;
 		end;
@@ -607,6 +607,12 @@ data   &LN..new_pt;
 	
 run;
 
+data &LN..NLM;
+	set &LN..new_pt;
+	if TRF < 6;
+	if pr_b > mdy(08,01,13) then onT = 1; else onT = 0;
+run;
+
 data &LN..LM;
 	set &LN..new_pt;
 	if TRF > 6;
@@ -717,6 +723,24 @@ run;
 proc freq data=&LN..new_pt ORDER = DATA;
    tables TR / nocum;
    title 'Результаты терапии';
+   format TR TR_f.;
+run;
+
+proc freq data=&LN..LM ORDER = DATA;
+   tables TR / nocum;
+   title 'Результаты терапии (Ландмарк)';
+   format TR TR_f.;
+run;
+
+proc freq data=&LN..NLM ORDER = DATA;
+   tables TR / nocum;
+   title 'Выбраковка (Ландмарк)';
+   format TR TR_f.;
+run;
+
+proc freq data=&LN..NLM ORDER = DATA;
+   tables onT / nocum;
+   title 'Выбраковка (Ландмарк) на лечении';
    format TR TR_f.;
 run;
 
@@ -1129,9 +1153,9 @@ run;
 %eventan (tmp2, Trel_LM, i_rel, 0,F,&y,BMT, BMT_f.,"Ландмарк. Регионы. Стратификация по виду лечения. Вероятность развития рецидива");
 
 
-%eventan (&LN..LM, TLive_LM, i_death, 0,,&y,AAC, AAC_f.,"Ландмарк анализ. Общая выживаемость");
-%eventan (&LN..LM, TRF_LM, iRF, 0,,&y,AAC, AAC_f.,"Ландмарк анализ. Безрецидивная выживаемость");
-%eventan (&LN..LM, Trel_LM, i_rel, 0,F,&y,AAC, AAC_f.,"Ландмарк анализ. Вероятность развития рецидива"); 
+%eventan (&LN..LM, TLive_LM, i_death, 0,,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк анализ. Общая выживаемость");
+%eventan (&LN..LM, TRF_LM, iRF, 0,,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк анализ. Безрецидивная выживаемость");
+%eventan (&LN..LM, Trel_LM, i_rel, 0,F,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк анализ. Вероятность развития рецидива"); 
 
 %eventan (&LN..LM, TLive_LM, i_death, 0,,&y,FRint, FRint_f.,"Ландмарк анализ. Стратификация по ПР. Общая выживаемость");
 %eventan (&LN..LM, TRF_LM, iRF, 0,,&y,FRint, FRint_f.,"Ландмарк анализ. Стратификация по ПР. Безрецидивная выживаемость");
@@ -1143,21 +1167,21 @@ run;
 
 data tmp;
 	set &LN..new_pt;
-	if AAC = 0;
+	if tkm_au_al = 0;
 run;
 
 data tmp2;
 	set &LN..LM;
-	if AAC = 0;
+	if tkm_au_al = 0;
 run;
 %eventan (tmp2, TLive_LM, i_death, 0,,&y,FRint, FRint_f.,"Химиотерапия. Ландмарк анализ. Стратификация по ПР. Общая выживаемость");
 %eventan (tmp2, TRF_LM, iRF, 0,,&y,FRint, FRint_f.,"Химиотерапия. Ландмарк анализ. Стратификация по ПР. Безрецидивная выживаемость");
 %eventan (tmp2, Trel_LM, i_rel, 0,F,&y,FRint, FRint_f.,"Химиотерапия. Ландмарк анализ. Стратификация по ПР. Вероятность развития рецидива");
 
 
-%eventan (tmp, TLive, i_death, 0,,&y,T_class12,T_class12_f.,"Химиотерапия. Стратификация по вариантам Т-ОЛЛ. Общая выживаемость");
-%eventan (tmp, TRF, iRF, 0,,&y,T_class12,T_class12_f.,"Химиотерапия.  Стратификация по вариантам Т-ОЛЛ. Безрецидивная выживаемость");
-%eventan (tmp, Trel, i_rel, 0,F,&y,T_class12,T_class12_f.,"Химиотерапия.  Стратификация по вариантам Т-ОЛЛ. Вероятность развития рецидива");
+%eventan (tmp2, TLive, i_death, 0,,&y,T_class12,T_class12_f.,"Химиотерапия. Ландмарк анализ. Стратификация по вариантам Т-ОЛЛ. Общая выживаемость");
+%eventan (tmp2, TRF, iRF, 0,,&y,T_class12,T_class12_f.,"Химиотерапия. Ландмарк анализ. Стратификация по вариантам Т-ОЛЛ. Безрецидивная выживаемость");
+%eventan (tmp2, Trel, i_rel, 0,F,&y,T_class12,T_class12_f.,"Химиотерапия. Ландмарк анализ. Стратификация по вариантам Т-ОЛЛ. Вероятность развития рецидива");
 
 %eventan (tmp, TLive, i_death, 0,,&y,reg, reg_f.,"Химиотерапия. Общая выживаемость");
 %eventan (tmp, TRF, iRF, 0,,&y,reg, reg_f.,"Химиотерапия.   Безрецидивная выживаемость");
@@ -1181,11 +1205,31 @@ proc phreg data=&LN..LM;
 	model Trel_LM*i_rel(0)= BMT reg; 
 	title "Ландмарк. Вероятность развития рецидива";
 run; 
+/**/
+/*proc sort  data = &LN..LM;*/
+/*	by FRint;*/
+/*run;*/
+/*proc print data = &LN..new_pt;*/
+/*	var pt_id name FRint Ttkm TR;*/
+/*	format FRint FRint_f.;*/
+/*	title "Ландмарк. Вероятность развития рецидива";*/
+/*run;*/
 
-proc sort  data = &LN..LM;
-	by FRint;
+proc sort data = &LN..NLM;
+	by pr_b;
 run;
-proc print data = &LN..LM;
-	var pt_id name FRint;
-	format FRint FRint_f.;
+
+proc print data = &LN..NLM;
+	var pt_id name FRint Ttkm TR i_death i_rel pr_b;
+	format FRint FRint_f. TR TR_f.;
+	title "Ландмарк. Выбраковка";
 run;
+
+data tmp2;
+	set &LN..LM;
+	if tkm_au_al in {0,1};
+run;
+
+%eventan (tmp2, TLive_LM, i_death, 0,,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк анализ. Общая выживаемость");
+%eventan (tmp2, TRF_LM, iRF, 0,,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк анализ. Безрецидивная выживаемость");
+%eventan (tmp2, Trel_LM, i_rel, 0,F,&y,tkm_au_al, tkm_au_al_f.,"Ландмарк анализ. Вероятность развития рецидива");
