@@ -608,14 +608,14 @@ run;
 
 data &LN..NLM;
 	set &LN..new_pt;
-	if not(TRF > 6 or tkm_au_al in (1,2));
+	if not(TR = 0 and (TRF > 6 or tkm_au_al in (1,2)));
 	if pr_b > mdy(08,01,13) then onT = 1; else onT = 0;
 run;
 
 data &LN..LM;
 	set &LN..new_pt;
 
-	if TRF > 6 or tkm_au_al in (1,2);
+	if TR = 0 and (TRF > 6 or tkm_au_al in (1,2));
 
 	select (tkm_au_al);
 		when (0) 
@@ -1300,4 +1300,18 @@ proc freq data=tmp2;
    format new_group_risk new_group_risk_f.;
 run;
 
+proc means data=tmp2 n median max min ;
+	var age new_hb	new_l	new_tp	blast_km	new_blast_pk	new_creatinine	new_bilirubin	new_ldh	new_albumin	new_protromb_ind	new_dlin_rs	new_poperech_rs;
+	title "Общие лабораторные показатели для ХТ";
+run;
 
+data a;
+	set &LN..LM;
+	if TRF < 6;
+run;
+
+proc print data = a;
+	var pt_id name TRF tkm_au_al;
+	format tkm_au_al tkm_au_al_f.;
+	title "новые пациенты";
+run;
